@@ -1,47 +1,50 @@
-import { useEffect, useState } from 'react'
-import { useLocalEntries } from '../hooks/useLocalEntries'
+import { useNavigate, useParams } from 'react-router-dom'
+import EntryEditor from '../components/EntryEditor'
 import { useToday } from '../hooks/useToday'
+import { formatEntryDate, getEntryKey, parseEntryKey } from '../utils/formatDate'
 
 export default function Journal() {
+  const { date } = useParams()
   const today = useToday()
-  const { entries, saveEntry } = useLocalEntries()
-  const [content, setContent] = useState('')
-  const [saved, setSaved] = useState(false)
+  const navigate = useNavigate()
 
-  useEffect(() => {
-    setContent(entries[today.key]?.content ?? '')
-  }, [entries, today.key])
+  const dateKey = date ?? today.key
+  const isToday = dateKey === today.key
 
-  function handleSave(event) {
-    event.preventDefault()
-    saveEntry(today.key, content)
-    setSaved(true)
-    window.setTimeout(() => setSaved(false), 1600)
+  function changeDate(value) {
+    if (!value) return
+    const key = getEntryKey(new Date(`${value}T12:00:00`))
+    navigate(key === today.key ? '/journal' : `/journal/${key}`)
   }
 
   return (
-    <section className="space-y-6">
-      <div>
-        <p className="text-sm uppercase tracking-[0.2em] text-accent">Today</p>
-        <h1 className="mt-2 font-display text-3xl text-stone-900">{today.label}</h1>
-      </div>
-      <form onSubmit={handleSave} className="space-y-4">
-        <textarea
-          value={content}
-          onChange={(event) => setContent(event.target.value)}
-          placeholder="What stayed with you today?"
-          className="min-h-80 w-full resize-y rounded-2xl border border-stone-200 bg-white/70 p-5 text-lg leading-8 text-stone-800 outline-none ring-accent/30 placeholder:text-stone-400 focus:ring-4"
-        />
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            className="rounded-full bg-stone-900 px-5 py-2.5 text-sm text-amber-50 hover:bg-stone-800"
-          >
-            Save entry
-          </button>
-          {saved ? <span className="text-sm text-accent">Saved</span> : null}
+    <div className="animate-fade-up space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="font-hand text-2xl leading-none text-accent">
+            {isToday ? 'today’s page' : 'a page from the past'}
+          </p>
+          <h1 className="mt-1 font-display text-3xl text-ink">{formatEntryDate(dateKey)}</h1>
         </div>
-      </form>
-    </section>
+        <label className="flex items-center gap-2 text-sm text-muted">
+          <span className="sr-only sm:not-sr-only">Jump to date</span>
+          <input
+            type="date"
+            value={dateKey}
+            max={today.key}
+            onChange={(event) => changeDate(event.target.value)}
+            className="rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink outline-none ring-accent/30 focus:ring-4"
+          />
+        </label>
+      </div>
+
+      {parseEntryKey(dateKey) > new Date() ? (
+        <p className="rounded-xl bg-accent-soft px-4 py-3 text-sm text-accent">
+          That date hasn’t happened yet — the future can wait.
+        </p>
+      ) : (
+        <EntryEditor key={dateKey} dateKey={dateKey} />
+      )}
+    </div>
   )
 }

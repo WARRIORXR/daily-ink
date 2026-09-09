@@ -3,10 +3,111 @@
 @theme {
   --font-sans: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-display: 'Fraunces', Georgia, serif;
-  --color-ink: #1c1917;
-  --color-paper: #faf6ef;
-  --color-paper-dark: #efe8dc;
-  --color-accent: #b45309;
+  --font-hand: 'Caveat', 'Segoe Script', cursive;
+
+  /* Semantic colors — resolved at runtime so .dark flips everything at once. */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-clay: var(--clay);
+  --color-clay-soft: var(--clay-soft);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+
+  --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.05), 0 10px 28px -14px rgba(28, 25, 23, 0.14);
+  --shadow-pop: 0 6px 16px -6px rgba(28, 25, 23, 0.18), 0 24px 48px -20px rgba(28, 25, 23, 0.28);
+
+  --animate-fade-in: fade-in 0.25s ease both;
+  --animate-fade-up: fade-up 0.35s ease both;
+  --animate-toast-in: toast-in 0.25s ease both;
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+}
+
+:root {
+  --bg: #faf6ef;
+  --surface: #fffdf7;
+  --surface-2: #f0e9dc;
+  --ink: #1c1917;
+  --muted: #57534e;
+  --faint: #a8a29e;
+  --border: #e7e0d2;
+  --accent: #b45309;
+  --accent-soft: rgba(180, 83, 9, 0.12);
+  --on-accent: #fffbeb;
+  --clay: #b4533a;
+  --clay-soft: rgba(180, 83, 58, 0.12);
+  --success: #15803d;
+  --danger: #b91c1c;
+}
+
+.dark {
+  --bg: #14120f;
+  --surface: #1e1b16;
+  --surface-2: #2c271e;
+  --ink: #ece5d8;
+  --muted: #a8a29e;
+  --faint: #6e675e;
+  --border: #342e25;
+  --accent: #d97706;
+  --accent-soft: rgba(217, 119, 6, 0.16);
+  --on-accent: #1c1917;
+  --clay: #e07a5f;
+  --clay-soft: rgba(224, 122, 95, 0.16);
+  --success: #4ade80;
+  --danger: #f87171;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 html,
@@ -18,6 +119,81 @@ body,
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background: var(--color-paper);
-  color: var(--color-ink);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* Subtle paper grain over everything — set-and-forget texture. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Subtle scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--faint) transparent;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ruled-paper background for the journal editor. */
+.editor-paper {
+  background-color: var(--surface);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 39px,
+    color-mix(in srgb, var(--accent) 9%, transparent) 39px,
+    color-mix(in srgb, var(--accent) 9%, transparent) 40px
+  );
+  background-attachment: local;
+}
+
+/* Drop cap for revealed memory entries. */
+.drop-cap::first-letter {
+  float: left;
+  font-family: var(--font-display);
+  font-size: 3.1em;
+  line-height: 0.82;
+  padding-right: 0.09em;
+  padding-top: 0.06em;
+  color: var(--accent);
 }
