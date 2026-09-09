@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-display: 'Fraunces', Georgia, serif;
+  --color-ink: #1c1917;
+  --color-paper: #faf6ef;
+  --color-paper-dark: #efe8dc;
+  --color-accent: #b45309;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
