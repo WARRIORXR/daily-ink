@@ -14,6 +14,35 @@ function readLocal() {
   }
 }
 
+function applyReviewEvent(state, payload) {
+  const { eventType, new: next, old } = payload
+  if (eventType === 'DELETE') {
+    const result = {}
+    for (const [key, review] of Object.entries(state)) {
+      if (review.id !== old.id) result[key] = review
+    }
+    return result
+  }
+  const dateKey = next.entry_date
+  const review = {
+    id: next.id,
+    intervalDays: next.interval_days,
+    easeFactor: next.ease_factor,
+    repetitions: next.repetitions,
+    dueDate: next.due_date,
+    lastReviewedAt: next.last_reviewed_at,
+  }
+  if (eventType === 'UPDATE' && state[dateKey]?.id !== next.id) {
+    const result = {}
+    for (const [key, existing] of Object.entries(state)) {
+      if (existing.id !== next.id) result[key] = existing
+    }
+    result[dateKey] = review
+    return result
+  }
+  return { ...state, [dateKey]: review }
+}
+
 export function useReviews() {
   const { user, mode } = useAuth()
   const { toast } = useToast()
@@ -68,6 +97,24 @@ export function useReviews() {
   useEffect(() => {
     load()
   }, [load])
+
+  // Realtime sync: review schedules update live from other devices.
+  useEffect(() => {
+    if (mode !== 'server' || !user) return undefined
+    const channel = supabase
+      .channel(`reviews-sync-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reviews', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          setReviews((current) => applyReviewEvent(current, payload))
+        },
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [mode, user])
 
   const upsertReview = useCallback(
     async (dateKey, schedule) => {

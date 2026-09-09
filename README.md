@@ -14,6 +14,7 @@ Write one page a day, track your streak, and let Daily Ink resurface old entries
 - **Calendar view** — month grid with dots for every written day, plus a day-detail panel
 - **Search & filters** — full-text search with date range, mood, and "has tasks" filters
 - **Dashboard** — current/longest streak, entry count, memories due, and quick actions
+- **Live sync** — entries, tasks, and review schedules update in real time across devices and tabs via Supabase Realtime (no refresh needed)
 
 ### Memory boosting
 - **On This Day** — past entries from the same date in previous years
@@ -44,7 +45,7 @@ Try the deployed version at **[daily-ink-three.vercel.app](https://daily-ink-thr
 Without Supabase credentials the app runs in **local mode** — everything stays in the browser. To enable cloud sync:
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `profiles`, `entries`, `tasks`, and `reviews` tables with RLS policies and signup triggers.
+2. Open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `profiles`, `entries`, `tasks`, and `reviews` tables with RLS policies and signup triggers, and registers the tables with the Realtime publication (needed for live cross-device sync). The file is safe to re-run — everything is idempotent.
 3. Copy `.env.example` to `.env.local` and fill in your project URL and anon key (Dashboard → Project Settings → API):
 
 ```
@@ -90,6 +91,12 @@ src/
   pages/                 Home (dashboard), Journal, Entries, Calendar,
                          Review, Settings, Login
 ```
+
+## How live sync works
+
+- When signed in, the app subscribes to `postgres_changes` on `entries`, `tasks`, and `reviews`, filtered to your user id (RLS still applies to Realtime events).
+- Writes from any device appear immediately: new entries, edits, deletes, task toggles, and completed reviews all stream in without a page refresh.
+- Sessions auto-refresh in the background and on tab focus, so a stale token never strands you on a loading screen.
 
 ## How the memory system works
 

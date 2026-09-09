@@ -20,6 +20,64 @@ function errorMessage(err, fallback) {
   return err?.message ?? fallback
 }
 
+function applyEntryEvent(state, payload) {
+  const { eventType, new: next, old } = payload
+  if (eventType === 'DELETE') {
+    const result = {}
+    for (const [key, entry] of Object.entries(state)) {
+      if (entry.id !== old.id) result[key] = entry
+    }
+    return result
+  }
+  const dateKey = next.entry_date
+  const entry = {
+    id: next.id,
+    content: next.content,
+    mood: next.mood,
+    encrypted: next.encrypted,
+    createdAt: next.created_at,
+    updatedAt: next.updated_at,
+  }
+  if (eventType === 'UPDATE' && state[dateKey]?.id !== next.id) {
+    // entry_date moved: drop the old key that held this row
+    const result = {}
+    for (const [key, existing] of Object.entries(state)) {
+      if (existing.id !== next.id) result[key] = existing
+    }
+    result[dateKey] = entry
+    return result
+  }
+  return { ...state, [dateKey]: entry }
+}
+
+function applyTaskEvent(state, payload) {
+  const { eventType, new: next, old } = payload
+  if (eventType === 'DELETE') {
+    const dateKey = old.entry_date
+    return {
+      ...state,
+      [dateKey]: (state[dateKey] ?? []).filter((t) => t.id !== old.id),
+    }
+  }
+  const fromKey = old?.entry_date
+  const dateKey = next.entry_date
+  const base = { ...state }
+  if (fromKey && fromKey !== dateKey) {
+    base[fromKey] = (base[fromKey] ?? []).filter((t) => t.id !== next.id)
+  }
+  const list = base[dateKey] ?? []
+  const task = {
+    id: next.id,
+    title: next.title,
+    done: next.done,
+    position: next.position,
+  }
+  const newList = list.some((t) => t.id === next.id)
+    ? list.map((t) => (t.id === next.id ? task : t))
+    : [...list, task].sort((a, b) => a.position - b.position)
+  return { ...base, [dateKey]: newList }
+}
+
 export function useEntries() {
   const { user, mode } = useAuth()
   const { toast } = useToast()
@@ -101,6 +159,31 @@ export function useEntries() {
   useEffect(() => {
     load()
   }, [load])
+
+  // Realtime sync: apply changes made on other devices/tabs as they happen.
+  useEffect(() => {
+    if (mode !== 'server' || !user) return undefined
+    const channel = supabase
+      .channel(`entries-sync-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'entries', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          setEntries((current) => applyEntryEvent(current, payload))
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          setTasks((current) => applyTaskEvent(current, payload))
+        },
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [mode, user])
 
   const saveEntry = useCallback(
     async (dateKey, patch) => {
