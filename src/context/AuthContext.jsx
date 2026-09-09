@@ -30,9 +30,21 @@ export function AuthProvider({ children }) {
       setLoading(false)
     })
 
+    // Refresh the session whenever the tab regains focus, so an expired
+    // token never leaves the user staring at a silent loading screen.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.refreshSession().catch(() => {
+          /* handled by onAuthStateChange */
+        })
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
     return () => {
       active = false
       subscription?.subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [])
 

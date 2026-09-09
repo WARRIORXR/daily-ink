@@ -172,3 +172,28 @@ drop trigger if exists tasks_set_updated_at on public.tasks;
 create trigger tasks_set_updated_at
   before update on public.tasks
   for each row execute function public.set_updated_at();
+
+-- ----------------------------------------------------------------------------
+-- Realtime (live sync across devices)
+-- Tables must be members of the supabase_realtime publication for
+-- postgres_changes subscriptions to deliver events. Idempotent so the
+-- whole file can be re-run safely.
+-- ----------------------------------------------------------------------------
+
+do $$
+begin
+  alter publication supabase_realtime add table public.entries;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.tasks;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.reviews;
+exception when duplicate_object then null;
+end $$;
