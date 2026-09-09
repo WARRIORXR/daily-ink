@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": "node .cursor/hooks/auto-push-github.mjs",
+        "timeout": 60
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+---
+description: Commit and push every completed change set to GitHub
+alwaysApply: true
+---
+
+# Auto-push to GitHub
+
+After finishing any code or config change in this repo:
+
+1. Stage relevant files (`git add`). Never stage `.env.local` or secrets.
+2. Commit with a short message that explains why.
+3. Push to `origin` on the current branch (`git push -u origin HEAD`).
+
+Do this at the end of every task, even if the user did not repeat "commit" or "push". A project hook also pushes when the agent turn stops; still push yourself so GitHub is up to date before the turn ends.
