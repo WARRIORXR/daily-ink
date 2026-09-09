@@ -4,6 +4,8 @@ A private, cross-platform daily journal built with **React + Vite + Tailwind CSS
 
 Write one page a day, track your streak, and let Daily Ink resurface old entries at the moment you'd otherwise forget them — with spaced-repetition reviews and a memory quiz before each reveal.
 
+> **🌐 Live demo:** [daily-ink-three.vercel.app](https://daily-ink-three.vercel.app/) — deployed via Vercel.
+
 ## Features
 
 ### Core
@@ -34,6 +36,8 @@ Write one page a day, track your streak, and let Daily Ink resurface old entries
 npm install
 npm run dev
 ```
+
+Try the deployed version at **[daily-ink-three.vercel.app](https://daily-ink-three.vercel.app/)** — or run it locally with the commands above.
 
 ### 1. Database (optional but recommended)
 
