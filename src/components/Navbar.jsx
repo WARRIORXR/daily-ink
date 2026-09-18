@@ -36,7 +36,7 @@ export function InkMark({ className = 'h-5 w-5' }) {
 }
 
 export default function Navbar() {
-  const { user, mode } = useAuth()
+  const { user } = useAuth()
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/85 backdrop-blur">
@@ -63,14 +63,7 @@ export default function Navbar() {
             </div>
             <div className="ml-1 flex shrink-0 items-center gap-1.5">
               <ThemeToggle />
-              {mode === 'guest' ? (
-                <Link
-                  to="/login"
-                  className="whitespace-nowrap rounded-full bg-accent px-4 py-1.5 text-sm text-on-accent transition hover:opacity-90"
-                >
-                  Sign in
-                </Link>
-              ) : user ? (
+              {user ? (
                 <Link
                   to="/settings"
                   aria-label={`Signed in as ${user.email}`}
@@ -79,7 +72,14 @@ export default function Navbar() {
                 >
                   {(user.email?.[0] ?? '?').toUpperCase()}
                 </Link>
-              ) : null}
+              ) : (
+                <Link
+                  to="/login"
+                  className="whitespace-nowrap rounded-full bg-accent px-3.5 py-1.5 text-xs sm:text-sm font-medium text-on-accent transition hover:opacity-90 shadow-sm"
+                >
+                  Sign in
+                </Link>
+              )}
             </div>
           </nav>
         </div>
