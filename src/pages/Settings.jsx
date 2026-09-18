@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { isSupabaseConfigured, supabaseUrl } from '../config/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useToast } from '../context/ToastContext'
@@ -34,7 +36,7 @@ function Row({ label, children }) {
 }
 
 export default function Settings() {
-  const { user, mode, signOut } = useAuth()
+  const { user, signOut } = useAuth()
   const { theme, setMode } = useTheme()
   const { toast } = useToast()
   const { entries, tasks } = useEntries()
@@ -147,30 +149,65 @@ export default function Settings() {
         <h1 className="mt-1 font-display text-3xl text-ink">Settings</h1>
       </header>
 
-      <Section title="Account">
+      <Section title="Account & Sync">
         <Row
           label={
             <div>
-              <p className="text-sm text-ink">
-                {mode === 'server' ? user?.email : 'Local mode'}
+              <p className="text-sm font-medium text-ink">
+                {user ? (
+                  <>
+                    {user.user_metadata?.display_name
+                      ? `${user.user_metadata.display_name} (${user.email})`
+                      : user.email}
+                  </>
+                ) : (
+                  'Local Mode (Offline)'
+                )}
               </p>
               <p className="text-xs text-faint">
-                {mode === 'server'
-                  ? 'Entries sync to your Supabase project.'
-                  : 'No Supabase credentials — everything stays on this device.'}
+                {user
+                  ? 'Your journal entries sync in real time to your private Supabase database.'
+                  : 'Pages are stored locally in this browser. Sign in to sync across devices.'}
               </p>
             </div>
           }
         >
-          {mode === 'server' ? (
+          {user ? (
             <button
               type="button"
               onClick={signOut}
-              className="rounded-full border border-border px-4 py-2 text-sm text-muted transition hover:bg-surface-2 hover:text-ink"
+              className="rounded-full border border-border px-4 py-1.5 text-xs sm:text-sm text-muted transition hover:bg-surface-2 hover:text-ink"
             >
               Sign out
             </button>
-          ) : null}
+          ) : (
+            <Link
+              to="/login"
+              className="rounded-full bg-accent px-4 py-1.5 text-xs sm:text-sm font-medium text-on-accent transition hover:opacity-90 shadow-sm"
+            >
+              Sign in / Connect
+            </Link>
+          )}
+        </Row>
+
+        <Row
+          label={
+            <div>
+              <p className="text-sm font-medium text-ink">Supabase Integration</p>
+              <p className="text-xs text-faint">
+                {isSupabaseConfigured
+                  ? `Configured: ${supabaseUrl.replace(/^https?:\/\//, '')}`
+                  : 'No credentials configured in .env.local'}
+              </p>
+            </div>
+          }
+        >
+          <Link
+            to="/login"
+            className="rounded-full border border-border px-3 py-1.5 text-xs text-muted hover:bg-surface-2 hover:text-ink transition"
+          >
+            Connection Status
+          </Link>
         </Row>
       </Section>
 

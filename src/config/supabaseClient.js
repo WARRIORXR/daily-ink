@@ -1,11 +1,27 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Vite exposes these from .env.local (see vite.config.js).
-// Values come from the Supabase dashboard: Project Settings → API.
-const supabaseUrl = import.meta.env.SUPABASE_URL
-const supabaseAnonKey = import.meta.env.SUPABASE_ANON_KEY
+// Vite exposes these from .env.local (see vite.config.js) or standard VITE_ prefixes.
+const rawUrl =
+  import.meta.env.VITE_SUPABASE_URL ||
+  import.meta.env.SUPABASE_URL ||
+  ''
+const rawKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.SUPABASE_ANON_KEY ||
+  import.meta.env.SUPABASE_PUBLISHABLE_KEY ||
+  ''
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+export const supabaseUrl = rawUrl.trim()
+export const supabaseAnonKey = rawKey.trim()
+
+// Consider configured only if non-empty and not the default placeholder
+export const isSupabaseConfigured = Boolean(
+  supabaseUrl &&
+    supabaseAnonKey &&
+    !supabaseUrl.includes('your-project') &&
+    (supabaseUrl.startsWith('http://') || supabaseUrl.startsWith('https://')),
+)
 
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {
@@ -22,3 +38,57 @@ export const supabase = isSupabaseConfigured
       },
     })
   : null
+
+/**
+ * Diagnostic helper to test whether the current Supabase instance is actually reachable.
+ * @returns {Promise<{ ok: boolean, status: 'unconfigured' | 'connected' | 'unreachable' | 'error', message: string }>}
+ */
+export async function testSupabaseConnection() {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      ok: false,
+      status: 'unconfigured',
+      message: 'Supabase credentials not set in .env.local',
+    }
+  }
+
+  try {
+    const response = await fetch(`${supabaseUrl}/auth/v1/health`, {
+      method: 'GET',
+      headers: {
+        apikey: supabaseAnonKey,
+      },
+    })
+
+    if (response.ok) {
+      return {
+        ok: true,
+        status: 'connected',
+        message: 'Successfully connected to Supabase.',
+      }
+    }
+
+    if (response.status < 500) {
+      return {
+        ok: true,
+        status: 'connected',
+        message: 'Supabase instance responded.',
+      }
+    }
+
+    return {
+      ok: false,
+      status: 'error',
+      message: `Supabase returned status ${response.status}`,
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      status: 'unreachable',
+      message:
+        err?.message?.includes('Failed to fetch') || err?.message?.includes('ENOTFOUND')
+          ? 'Cannot reach Supabase host. Please check your project URL or network.'
+          : err?.message || 'Network error connecting to Supabase.',
+    }
+  }
+}
