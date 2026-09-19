@@ -99,7 +99,7 @@ export default function AuthForm() {
           setError(signUpError)
         } else if (needsConfirmation) {
           setNotice('Verification email sent! Check your inbox to confirm your account.')
-          setMode('signin')
+          switchMode('signin')
         }
       } else if (mode === 'magiclink') {
         const { error: otpError } = await signInWithOtp(email.trim())
@@ -121,7 +121,7 @@ export default function AuthForm() {
           setError(updateError)
         } else {
           setNotice('Password updated successfully! You can now sign in.')
-          setMode('signin')
+          switchMode('signin')
         }
       }
     } catch (err) {

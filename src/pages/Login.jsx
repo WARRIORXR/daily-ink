@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import AuthForm from '../components/AuthForm'
 import Modal from '../components/Modal'
 import { InkMark } from '../components/Navbar'
