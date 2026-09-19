@@ -271,11 +271,15 @@ export function AuthProvider({ children }) {
   }, [exitGuestMode])
 
   // Mode resolution:
-  // - 'local'  : Supabase unconfigured, OR user explicitly chose guest/local mode
-  // - 'server' : User is signed in with active Supabase session
-  // - 'guest'  : Supabase configured, but user has not signed in or opted into guest mode yet
+  // - 'local'  : Supabase is NOT configured (no credentials) — offline/local-only mode
+  // - 'server' : User has an active Supabase session — fully authenticated
+  // - 'guest'  : Supabase IS configured but user is not signed in — login required
+  //
+  // NOTE: When Supabase is configured, login is mandatory. The isGuest flag no longer
+  // grants access to core features; it only persists as a legacy localStorage value
+  // that is cleared on next sign-in.
   const mode =
-    !isSupabaseConfigured || (!session?.user && isGuest)
+    !isSupabaseConfigured
       ? 'local'
       : session?.user
         ? 'server'
