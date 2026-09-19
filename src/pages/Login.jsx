@@ -125,8 +125,7 @@ export default function Login() {
       </footer>
 
       {/* Supabase Connection Setup Guide Modal */}
-      {showSetupGuide && (
-        <Modal onClose={() => setShowSetupGuide(false)} title="Connect Supabase">
+      <Modal open={showSetupGuide} onClose={() => setShowSetupGuide(false)} title="Connect Supabase">
           <div className="space-y-4 text-sm text-ink">
             <p className="text-muted">
               Daily Ink uses Supabase for user authentication, cloud sync, and real-time multi-device updates.
@@ -192,7 +191,6 @@ SUPABASE_ANON_KEY=your-anon-key`}
             </div>
           </div>
         </Modal>
-      )}
     </div>
   )
 }

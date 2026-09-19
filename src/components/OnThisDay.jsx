@@ -129,13 +129,13 @@ export default function OnThisDay({ entries }) {
         <p className="font-hand text-lg text-faint">same date, past years</p>
       </div>
       <div className="space-y-3">
-        {items.map(([dateKey, entry], index) => (
+        {items.map(([dateKey, entry]) => (
           <OnThisDayItem
             key={dateKey}
             dateKey={dateKey}
             entry={entry}
             otherKeys={otherKeys}
-            yearsAgo={items.length - 1 - index}
+            yearsAgo={new Date().getFullYear() - parseInt(dateKey.slice(0, 4), 10)}
           />
         ))}
       </div>
