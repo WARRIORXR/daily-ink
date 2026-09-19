@@ -8,7 +8,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(isSupabaseConfigured)
   const [error, setError] = useState(null)
-  const [isGuest, setIsGuest] = useState(() => {
+  const [_isGuest, setIsGuest] = useState(() => {
     try {
       return localStorage.getItem(GUEST_KEY) === 'true'
     } catch {
@@ -66,15 +66,6 @@ export function AuthProvider({ children }) {
       active = false
       subscription?.subscription.unsubscribe()
       document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
-  }, [])
-
-  const continueAsGuest = useCallback(() => {
-    setIsGuest(true)
-    try {
-      localStorage.setItem(GUEST_KEY, 'true')
-    } catch {
-      /* ignore */
     }
   }, [])
 
@@ -290,12 +281,9 @@ export function AuthProvider({ children }) {
     loading,
     error,
     configured: isSupabaseConfigured,
-    isGuest,
     isRecoveryMode,
     setIsRecoveryMode,
     mode,
-    continueAsGuest,
-    exitGuestMode,
     signIn,
     signUp,
     signInWithOtp,
