@@ -54,7 +54,6 @@ export default function AuthForm() {
     signInWithOAuth,
     resetPassword,
     updatePassword,
-    continueAsGuest,
     configured,
     isRecoveryMode,
     setIsRecoveryMode,
@@ -347,16 +346,6 @@ export default function AuthForm() {
         )}
       </div>
 
-      {/* Guest / Offline Mode Option */}
-      <div className="mt-6 border-t border-border pt-4 text-center">
-        <button
-          type="button"
-          onClick={continueAsGuest}
-          className="text-xs text-muted hover:text-ink underline-offset-4 hover:underline transition"
-        >
-          Continue as Guest (Offline / Local Mode) →
-        </button>
-      </div>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import AuthForm from '../components/AuthForm'
 import Modal from '../components/Modal'
 import { InkMark } from '../components/Navbar'
@@ -8,7 +8,7 @@ import { isSupabaseConfigured, supabaseUrl, testSupabaseConnection } from '../co
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-  const { mode, loading, isGuest } = useAuth()
+  const { mode, loading } = useAuth()
   const [connStatus, setConnStatus] = useState({
     checked: false,
     ok: false,
@@ -109,16 +109,6 @@ export default function Login() {
             <AuthForm />
           </div>
 
-          {isGuest && (
-            <div className="mt-4 text-center">
-              <Link
-                to="/"
-                className="text-xs text-muted hover:text-ink underline-offset-4 hover:underline"
-              >
-                ← Return to your local journal
-              </Link>
-            </div>
-          )}
         </div>
       </main>
 
