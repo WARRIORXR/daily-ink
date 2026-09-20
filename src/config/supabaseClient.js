@@ -1,16 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 
+const defaultUrl = 'https://yqxayuoerwbuaabemrab.supabase.co'
+const defaultKey =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxeGF5dW9lcndidWFhYmVtcmFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzcxMTUsImV4cCI6MjEwNDU1MzExNX0.0qO0M7dDa_IpEziuAS5GXmXKyqoqRJV37dj2qWVZomc'
+
 // Vite exposes these from .env.local (see vite.config.js) or standard VITE_ prefixes.
 const rawUrl =
   import.meta.env.VITE_SUPABASE_URL ||
   import.meta.env.SUPABASE_URL ||
-  ''
+  defaultUrl
 const rawKey =
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   import.meta.env.SUPABASE_ANON_KEY ||
   import.meta.env.SUPABASE_PUBLISHABLE_KEY ||
-  ''
+  defaultKey
 
 export const supabaseUrl = rawUrl.trim()
 export const supabaseAnonKey = rawKey.trim()
