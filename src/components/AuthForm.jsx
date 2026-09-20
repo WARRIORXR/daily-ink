@@ -54,7 +54,6 @@ export default function AuthForm() {
     signInWithOAuth,
     resetPassword,
     updatePassword,
-    configured,
     isRecoveryMode,
     setIsRecoveryMode,
   } = useAuth()
@@ -177,15 +176,15 @@ export default function AuthForm() {
       ) : null}
 
       {/* Social Logins (Google) — available for signin & signup */}
-      {(mode === 'signin' || mode === 'signup') && configured ? (
+      {(mode === 'signin' || mode === 'signup') && (
         <div className="mt-5 space-y-3">
           <button
             type="button"
             onClick={handleGoogleLogin}
             disabled={busy}
-            className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-surface-2 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-surface-2 active:scale-[0.99] disabled:opacity-50 shadow-sm"
           >
-            <GoogleIcon className="h-4 w-4" />
+            <GoogleIcon className="h-4.5 w-4.5" />
             Continue with Google
           </button>
 
@@ -195,7 +194,7 @@ export default function AuthForm() {
             <div className="h-px flex-1 bg-border" />
           </div>
         </div>
-      ) : null}
+      )}
 
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
         {mode === 'signup' && (
