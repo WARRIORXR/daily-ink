@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { isSupabaseConfigured, supabaseUrl } from '../config/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useToast } from '../context/ToastContext'
@@ -166,7 +165,7 @@ export default function Settings() {
               </p>
               <p className="text-xs text-faint">
                 {user
-                  ? 'Your journal entries sync in real time to your private Supabase database.'
+                  ? 'Your journal entries sync securely in real time across your devices.'
                   : 'Pages are stored locally in this browser. Sign in to sync across devices.'}
               </p>
             </div>
@@ -188,26 +187,6 @@ export default function Settings() {
               Sign in / Connect
             </Link>
           )}
-        </Row>
-
-        <Row
-          label={
-            <div>
-              <p className="text-sm font-medium text-ink">Supabase Integration</p>
-              <p className="text-xs text-faint">
-                {isSupabaseConfigured
-                  ? `Configured: ${supabaseUrl.replace(/^https?:\/\//, '')}`
-                  : 'No credentials configured in .env.local'}
-              </p>
-            </div>
-          }
-        >
-          <Link
-            to="/login"
-            className="rounded-full border border-border px-3 py-1.5 text-xs text-muted hover:bg-surface-2 hover:text-ink transition"
-          >
-            Connection Status
-          </Link>
         </Row>
       </Section>
 
