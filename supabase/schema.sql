@@ -197,3 +197,48 @@ begin
   alter publication supabase_realtime add table public.reviews;
 exception when duplicate_object then null;
 end $$;
+
+-- ----------------------------------------------------------------------------
+-- Routines / Custom Interval Schedule
+-- ----------------------------------------------------------------------------
+
+create table if not exists public.routines (
+  id                uuid primary key default gen_random_uuid(),
+  user_id           uuid not null references auth.users (id) on delete cascade,
+  title             text not null,
+  gap_days          integer not null default 3,
+  start_date        date not null,
+  color             text not null default '#f59e0b',
+  icon              text default '',
+  adjust_from_last  boolean not null default true,
+  completions       jsonb not null default '[]'::jsonb,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+create index if not exists routines_user_idx on public.routines (user_id);
+
+alter table public.routines enable row level security;
+
+create policy "routines_select_own" on public.routines
+  for select using (auth.uid() = user_id);
+
+create policy "routines_insert_own" on public.routines
+  for insert with check (auth.uid() = user_id);
+
+create policy "routines_update_own" on public.routines
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "routines_delete_own" on public.routines
+  for delete using (auth.uid() = user_id);
+
+drop trigger if exists routines_set_updated_at on public.routines;
+create trigger routines_set_updated_at
+  before update on public.routines
+  for each row execute function public.set_updated_at();
+
+do $$
+begin
+  alter publication supabase_realtime add table public.routines;
+exception when duplicate_object then null;
+end $$;
