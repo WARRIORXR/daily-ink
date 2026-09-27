@@ -5,9 +5,11 @@ import StatsCards from '../components/StatsCards'
 import StreakBadge from '../components/StreakBadge'
 import { useEntries } from '../hooks/useEntries'
 import { useReviews } from '../hooks/useReviews'
+import { useRoutines } from '../hooks/useRoutines'
 import { useToday } from '../hooks/useToday'
 import { computeStreaks } from '../utils/streaks'
 import { buildDueQueue } from '../utils/spacedRepetition'
+import { getRoutinesForDate } from '../utils/routines'
 
 function greeting() {
   const hour = new Date().getHours()
@@ -21,6 +23,9 @@ export default function Home() {
   const today = useToday()
   const { entries, loading } = useEntries()
   const { reviews } = useReviews()
+  const { routines, toggleCompletion } = useRoutines()
+
+  const todayRoutines = getRoutinesForDate(routines, today.key)
 
   const stats = useMemo(() => {
     const streaks = computeStreaks(Object.keys(entries), today.key)
@@ -67,6 +72,60 @@ export default function Home() {
       <StreakBadge current={stats.current} missedToday={stats.missedToday} />
 
       <StatsCards stats={stats} />
+
+      {/* Today's Routines */}
+      {todayRoutines.length > 0 && (
+        <section aria-label="Routines due today" className="rounded-2xl border border-accent/30 bg-surface p-5 shadow-card space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-accent" />
+              <h2 className="font-display text-lg text-ink">Routines Due Today</h2>
+            </div>
+            <Link to="/calendar" className="text-xs font-medium text-accent hover:underline">
+              View Calendar →
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {todayRoutines.map((routine) => {
+              const isCompleted = routine.completions?.includes(today.key)
+              return (
+                <div
+                  key={routine.id}
+                  onClick={() => toggleCompletion(routine.id, today.key)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      toggleCompletion(routine.id, today.key)
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer select-none ${
+                    isCompleted
+                      ? 'border-success/30 bg-success/5 text-muted'
+                      : 'border-border bg-surface-2 hover:border-accent/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-lg">{routine.icon || '✨'}</span>
+                    <span className={`text-sm font-medium truncate ${isCompleted ? 'line-through text-muted' : 'text-ink'}`}>
+                      {routine.title}
+                    </span>
+                  </div>
+                  <span
+                    className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] transition ${
+                      isCompleted ? 'border-success bg-success text-white' : 'border-border'
+                    }`}
+                  >
+                    {isCompleted && '✓'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Link

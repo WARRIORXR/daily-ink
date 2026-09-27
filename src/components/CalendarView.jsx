@@ -1,6 +1,7 @@
 import { addMonths, format, isToday, subMonths } from 'date-fns'
 import { useState } from 'react'
 import { getEntryKey, getMonthLabel, getMonthWeeks, isDayInMonth, parseEntryKey } from '../utils/formatDate'
+import { getRoutinesForDate } from '../utils/routines'
 
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
@@ -17,7 +18,7 @@ function NavButton({ onClick, label, children }) {
   )
 }
 
-export default function CalendarView({ entries, selectedDate, onSelectDate }) {
+export default function CalendarView({ entries, routines = [], selectedDate, onSelectDate }) {
   const [cursor, setCursor] = useState(() =>
     selectedDate ? parseEntryKey(selectedDate) : new Date(),
   )
@@ -75,6 +76,8 @@ export default function CalendarView({ entries, selectedDate, onSelectDate }) {
           const inMonth = isDayInMonth(day, cursor)
           const selected = key === selectedDate
           const today = isToday(day)
+          const dayRoutines = getRoutinesForDate(routines, key)
+
           return (
             <button
               key={key}
@@ -91,6 +94,8 @@ export default function CalendarView({ entries, selectedDate, onSelectDate }) {
               } ${today && !selected ? 'ring-1 ring-inset ring-accent/50' : ''}`}
             >
               {format(day, 'd')}
+
+              {/* Journal entry indicator dot */}
               {hasEntry(day) && (
                 <span
                   aria-hidden="true"
@@ -99,14 +104,36 @@ export default function CalendarView({ entries, selectedDate, onSelectDate }) {
                   }`}
                 />
               )}
+
+              {/* Routine indicator dots */}
+              {dayRoutines.length > 0 && (
+                <div className="absolute top-1.5 right-1.5 flex gap-0.5">
+                  {dayRoutines.slice(0, 3).map((r) => {
+                    const isCompleted = r.completions?.includes(key)
+                    return (
+                      <span
+                        key={r.id}
+                        title={`${r.icon ? `${r.icon} ` : ''}${r.title}${isCompleted ? ' (Done)' : ''}`}
+                        className={`h-1.5 w-1.5 rounded-full transition-all ${
+                          isCompleted ? 'opacity-40 ring-1 ring-black/20 dark:ring-white/30' : 'opacity-90'
+                        }`}
+                        style={{ backgroundColor: selected ? '#ffffff' : r.color }}
+                      />
+                    )
+                  })}
+                </div>
+              )}
             </button>
           )
         })}
       </div>
 
-      <div className="flex items-center gap-4 text-xs text-faint">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-faint">
         <span className="flex items-center gap-1.5">
           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" /> has an entry
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-500" /> routine scheduled
         </span>
         <span className="flex items-center gap-1.5">
           <span aria-hidden="true" className="h-3 w-3 rounded ring-1 ring-inset ring-accent/60" /> today
