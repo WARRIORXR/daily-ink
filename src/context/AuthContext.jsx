@@ -33,12 +33,27 @@ export function AuthProvider({ children }) {
     }
 
     let active = true
+
+    // Check for OAuth / magic-link callback on mount and after redirect.
+    // Supabase appends ?code=...&state=... to the redirect_to URL.
     supabase.auth
       .getSession()
       .then(({ data }) => {
         if (active) {
           setSession(data?.session ?? null)
           setLoading(false)
+
+          // If we have no session but the URL has OAuth code params,
+          // exchange the code for a session.
+          const params = new URLSearchParams(window.location.search)
+          if (!data?.session && (params.has('code') || params.has('provider'))) {
+            supabase.auth.getSession().then(({ data: sessionData }) => {
+              if (active && sessionData?.session) {
+                setSession(sessionData.session)
+                setLoading(false)
+              }
+            })
+          }
         }
       })
       .catch(() => {
@@ -49,8 +64,14 @@ export function AuthProvider({ children }) {
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecoveryMode(true)
       }
-      setSession(next)
-      setLoading(false)
+      if (event === 'USER_UPDATED' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setSession(next)
+        setLoading(false)
+      }
+      if (event === 'SIGNED_OUT') {
+        setSession(null)
+        setLoading(false)
+      }
     })
 
     const onVisibilityChange = () => {

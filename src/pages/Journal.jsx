@@ -19,12 +19,12 @@ export default function Journal() {
 
   return (
     <div className="animate-fade-up space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-hand text-2xl leading-none text-accent">
+          <p className="font-hand text-xl sm:text-2xl leading-none text-accent">
             {isToday ? 'today’s page' : 'a page from the past'}
           </p>
-          <h1 className="mt-1 font-display text-3xl text-ink">{formatEntryDate(dateKey)}</h1>
+          <h1 className="mt-1 font-display text-2xl sm:text-3xl text-ink">{formatEntryDate(dateKey)}</h1>
         </div>
         <label className="flex items-center gap-2 text-sm text-muted">
           <span className="sr-only sm:not-sr-only">Jump to date</span>
@@ -33,7 +33,7 @@ export default function Journal() {
             value={dateKey}
             max={today.key}
             onChange={(event) => changeDate(event.target.value)}
-            className="rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink outline-none ring-accent/30 focus:ring-4"
+            className="w-full sm:w-auto rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink outline-none ring-accent/30 focus:ring-4"
           />
         </label>
       </div>

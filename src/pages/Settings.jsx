@@ -7,7 +7,11 @@ import { useEncryption } from '../hooks/useEncryption'
 import { useEntries } from '../hooks/useEntries'
 import { useLock } from '../hooks/useLock'
 import { useReviews } from '../hooks/useReviews'
-import { buildJSONExport, buildMarkdownExport, downloadText } from '../utils/exportData'
+import {
+  buildJSONExport,
+  buildMarkdownExport,
+  downloadText,
+} from '../utils/exportData'
 
 const inputClass =
   'w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-ink outline-none ring-accent/30 placeholder:text-faint focus:ring-4'
@@ -16,10 +20,15 @@ function Section({ title, children, description }) {
   return (
     <section className="rounded-2xl border border-border bg-surface p-5 shadow-card sm:p-6">
       <div className="flex items-center gap-2">
-        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
+        <span
+          aria-hidden="true"
+          className="h-1.5 w-1.5 rounded-full bg-accent"
+        />
         <h2 className="font-display text-lg text-ink">{title}</h2>
       </div>
-      {description ? <p className="mt-1 pl-3.5 text-sm text-muted">{description}</p> : null}
+      {description && (
+        <p className="mt-1 pl-3.5 text-sm text-muted">{description}</p>
+      )}
       <div className="mt-4 space-y-4">{children}</div>
     </section>
   )
@@ -67,7 +76,7 @@ export default function Settings() {
       await encryption.enable(passphrase)
       setPassphrase('')
       setConfirmPass('')
-      toast('Encryption enabled — new entries are encrypted before upload', 'success')
+      toast('Encryption enabled — new entries are encrypted', 'success')
     } catch (err) {
       toast(err?.message ?? 'Could not enable encryption', 'error')
     } finally {
@@ -125,7 +134,11 @@ export default function Settings() {
       if (format === 'json') {
         downloadText(
           `daily-ink-export-${new Date().toISOString().slice(0, 10)}.json`,
-          JSON.stringify(buildJSONExport(entries, tasks, reviews), null, 2),
+          JSON.stringify(
+            buildJSONExport(entries, tasks, reviews),
+            null,
+            2,
+          ),
           'application/json',
         )
       } else {
@@ -148,25 +161,31 @@ export default function Settings() {
         <h1 className="mt-1 font-display text-3xl text-ink">Settings</h1>
       </header>
 
-      <Section title="Account & Sync">
+      {/* Account & Sync */}
+      <Section
+        title="Account & Sync"
+        description="Sign in to sync your journal across devices. Without it, everything stays in this browser."
+      >
         <Row
           label={
-            <div>
+            <div className="space-y-0.5">
               <p className="text-sm font-medium text-ink">
                 {user ? (
-                  <>
-                    {user.user_metadata?.display_name
-                      ? `${user.user_metadata.display_name} (${user.email})`
-                      : user.email}
-                  </>
+                  user.user_metadata?.display_name ? (
+                    <>
+                      {user.user_metadata.display_name} ({user.email})
+                    </>
+                  ) : (
+                    user.email
+                  )
                 ) : (
                   'Local Mode (Offline)'
                 )}
               </p>
               <p className="text-xs text-faint">
                 {user
-                  ? 'Your journal entries sync securely in real time across your devices.'
-                  : 'Pages are stored locally in this browser. Sign in to sync across devices.'}
+                  ? 'Entries sync securely across your devices.'
+                  : 'Pages are stored locally. Sign in to sync.'}
               </p>
             </div>
           }
@@ -190,8 +209,13 @@ export default function Settings() {
         </Row>
       </Section>
 
+      {/* Appearance */}
       <Section title="Appearance">
-        <div role="radiogroup" aria-label="Theme" className="flex flex-wrap gap-2">
+        <div
+          role="radiogroup"
+          aria-label="Theme"
+          className="flex flex-wrap gap-2"
+        >
           {[
             ['light', 'Light'],
             ['dark', 'Dark'],
@@ -215,54 +239,74 @@ export default function Settings() {
         </div>
       </Section>
 
+      {/* Encryption */}
       <Section
         title="Encryption"
-        description="Optional client-side encryption: entries are encrypted with AES-256 before they ever leave this device. The passphrase is never stored — if you forget it, encrypted entries are unrecoverable."
+        description="Encrypt entries with a passphrase before they leave this device. The passphrase is never stored — if you lose it, encrypted entries can't be recovered."
       >
         {!encryption.enabled ? (
           <form onSubmit={handleEnableEncryption} className="space-y-3">
-            <div>
-              <label htmlFor="enc-pass" className="mb-1 block text-sm text-muted">
-                Passphrase (min 8 characters)
-              </label>
-              <input
-                id="enc-pass"
-                type="password"
-                value={passphrase}
-                onChange={(event) => setPassphrase(event.target.value)}
-                className={inputClass}
-                autoComplete="new-password"
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="enc-pass"
+                  className="mb-1 block text-sm text-muted"
+                >
+                  Passphrase
+                </label>
+                <input
+                  id="enc-pass"
+                  type="password"
+                  value={passphrase}
+                  onChange={(event) =>
+                    setPassphrase(event.target.value)
+                  }
+                  className={inputClass}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="enc-confirm"
+                  className="mb-1 block text-sm text-muted"
+                >
+                  Confirm
+                </label>
+                <input
+                  id="enc-confirm"
+                  type="password"
+                  value={confirmPass}
+                  onChange={(event) =>
+                    setConfirmPass(event.target.value)
+                  }
+                  className={inputClass}
+                  autoComplete="new-password"
+                />
+              </div>
             </div>
-            <div>
-              <label htmlFor="enc-confirm" className="mb-1 block text-sm text-muted">
-                Confirm passphrase
-              </label>
-              <input
-                id="enc-confirm"
-                type="password"
-                value={confirmPass}
-                onChange={(event) => setConfirmPass(event.target.value)}
-                className={inputClass}
-                autoComplete="new-password"
-              />
-            </div>
+            <p className="text-xs text-faint">
+              At least 8 characters. Don't lose it — there's no recovery.
+            </p>
             <button
               type="submit"
               disabled={encBusy}
               className="rounded-full bg-accent px-5 py-2 text-sm text-on-accent transition hover:opacity-90 disabled:opacity-50"
             >
-              Enable encryption
+              {encBusy ? 'Enabling…' : 'Enable encryption'}
             </button>
           </form>
         ) : encryption.unlocked ? (
           <div className="space-y-3">
-            <p className="text-sm text-success">🔒 Encryption is on and unlocked this session.</p>
+            <p className="text-sm text-success">
+              🔒 Encryption is on and unlocked this session.
+            </p>
             <Row
               label={
-                <div>
+                <div className="space-y-0.5">
                   <p className="text-sm text-ink">Lock this session</p>
-                  <p className="text-xs text-faint">You’ll need the passphrase to decrypt again.</p>
+                  <p className="text-xs text-faint">
+                    You'll need the passphrase to decrypt again.
+                  </p>
                 </div>
               }
             >
@@ -276,10 +320,10 @@ export default function Settings() {
             </Row>
             <Row
               label={
-                <div>
+                <div className="space-y-0.5">
                   <p className="text-sm text-ink">Turn off encryption</p>
                   <p className="text-xs text-faint">
-                    Existing encrypted entries stay encrypted; new entries will be plaintext.
+                    Existing encrypted entries stay encrypted.
                   </p>
                 </div>
               }
@@ -287,7 +331,11 @@ export default function Settings() {
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm('Disable encryption? Existing encrypted entries remain encrypted.')) {
+                  if (
+                    window.confirm(
+                      'Disable encryption? Existing encrypted entries remain encrypted.',
+                    )
+                  ) {
                     encryption.disable()
                     toast('Encryption disabled', 'success')
                   }
@@ -301,17 +349,22 @@ export default function Settings() {
         ) : (
           <form onSubmit={handleUnlockEncryption} className="space-y-3">
             <p className="text-sm text-muted">
-              🔒 Encryption is on. Enter your passphrase to unlock it for this session.
+              🔒 Encryption is on. Enter your passphrase to unlock it.
             </p>
             <div>
-              <label htmlFor="enc-unlock" className="mb-1 block text-sm text-muted">
+              <label
+                htmlFor="enc-unlock"
+                className="mb-1 block text-sm text-muted"
+              >
                 Passphrase
               </label>
               <input
                 id="enc-unlock"
                 type="password"
                 value={passphrase}
-                onChange={(event) => setPassphrase(event.target.value)}
+                onChange={(event) =>
+                  setPassphrase(event.target.value)
+                }
                 className={inputClass}
                 autoComplete="current-password"
               />
@@ -327,15 +380,19 @@ export default function Settings() {
         )}
       </Section>
 
+      {/* App lock */}
       <Section
-        title="App lock"
+        title="App Lock"
         description="Lock the app on this device. A PIN is always available; biometrics (face or fingerprint) can be added when supported."
       >
         {!lock.configured ? (
           <form onSubmit={handleEnableLock} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label htmlFor="lock-pin-new" className="mb-1 block text-sm text-muted">
+                <label
+                  htmlFor="lock-pin-new"
+                  className="mb-1 block text-sm text-muted"
+                >
                   PIN
                 </label>
                 <input
@@ -349,7 +406,10 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <label htmlFor="lock-pin-confirm" className="mb-1 block text-sm text-muted">
+                <label
+                  htmlFor="lock-pin-confirm"
+                  className="mb-1 block text-sm text-muted"
+                >
                   Confirm PIN
                 </label>
                 <input
@@ -357,18 +417,21 @@ export default function Settings() {
                   type="password"
                   inputMode="numeric"
                   value={pinConfirm}
-                  onChange={(event) => setPinConfirm(event.target.value)}
+                  onChange={(event) =>
+                    setPinConfirm(event.target.value)
+                  }
                   className={inputClass}
                   autoComplete="new-password"
                 />
               </div>
             </div>
+            <p className="text-xs text-faint">At least 4 digits.</p>
             <button
               type="submit"
               disabled={lockBusy}
               className="rounded-full bg-accent px-5 py-2 text-sm text-on-accent transition hover:opacity-90 disabled:opacity-50"
             >
-              Enable lock
+              {lockBusy ? 'Enabling…' : 'Enable lock'}
             </button>
           </form>
         ) : (
@@ -376,9 +439,11 @@ export default function Settings() {
             <p className="text-sm text-success">🔒 Lock is enabled.</p>
             <Row
               label={
-                <div>
+                <div className="space-y-0.5">
                   <p className="text-sm text-ink">Lock the app now</p>
-                  <p className="text-xs text-faint">Reopens only with your PIN or biometrics.</p>
+                  <p className="text-xs text-faint">
+                    Reopens only with your PIN or biometrics.
+                  </p>
                 </div>
               }
             >
@@ -390,10 +455,11 @@ export default function Settings() {
                 Lock now
               </button>
             </Row>
+
             {lock.biometricSupported ? (
               <Row
                 label={
-                  <div>
+                  <div className="space-y-0.5">
                     <p className="text-sm text-ink">Biometric unlock</p>
                     <p className="text-xs text-faint">
                       {lock.hasBiometric
@@ -416,6 +482,7 @@ export default function Settings() {
                 Biometrics aren’t supported here (needs a secure context).
               </p>
             )}
+
             <button
               type="button"
               onClick={() => {
@@ -432,8 +499,9 @@ export default function Settings() {
         )}
       </Section>
 
+      {/* Data export */}
       <Section
-        title="Your data"
+        title="Your Data"
         description="Everything you write is yours. Export it any time — JSON for archives, Markdown for reading."
       >
         <div className="flex flex-wrap gap-2">
@@ -455,8 +523,8 @@ export default function Settings() {
       </Section>
 
       <p className="text-center text-xs text-faint">
-        Daily Ink · entries sync via Supabase with row-level security · optional AES-256
-        client-side encryption
+        Daily Ink · entries sync via Supabase with row-level security ·{' '}
+        optional AES-256 client-side encryption
       </p>
     </div>
   )
