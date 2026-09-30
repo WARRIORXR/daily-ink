@@ -136,10 +136,13 @@ export default function AuthForm() {
     setBusy(true)
     try {
       const { error: oauthError } = await signInWithOAuth('google')
-      if (oauthError) setError(oauthError)
+      if (oauthError) {
+        setError(oauthError)
+      }
+      // OAuth redirects to Google and back — don't clear busy here.
+      // The app will reload / re-render when the session is set.
     } catch (err) {
       setError(err?.message || 'Failed to connect to Google.')
-    } finally {
       setBusy(false)
     }
   }
@@ -184,9 +187,27 @@ export default function AuthForm() {
             disabled={busy}
             className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-surface-2 active:scale-[0.99] disabled:opacity-50 shadow-sm"
           >
+            {busy && (
+              <svg
+                className="h-4.5 w-4.5 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+              </svg>
+            )}
             <GoogleIcon className="h-4.5 w-4.5" />
             Continue with Google
           </button>
+
+          {busy && (
+            <p className="text-xs text-faint text-center">
+              Redirecting to Google — coming right back to Daily Ink.
+            </p>
+          )}
 
           <div className="flex items-center gap-2 my-4">
             <div className="h-px flex-1 bg-border" />

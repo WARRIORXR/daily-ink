@@ -66,12 +66,13 @@ export default function EntryEditor({ dateKey }) {
   const isToday = dateKey === new Date().toISOString().slice(0, 10)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-4">
+      {/* Mood + status bar — compact on mobile, side-by-side on desktop */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <MoodPicker value={mood} onChange={setMood} />
-        <span aria-live="polite" className="ml-auto flex items-center gap-2 text-sm text-faint">
+        <div className="ml-auto flex items-center gap-2 text-xs sm:text-sm text-faint">
           <span
-            className={`h-1.5 w-1.5 rounded-full transition ${
+            className={`h-2 w-2 rounded-full transition ${
               status === 'saving'
                 ? 'animate-pulse bg-accent'
                 : status === 'saved'
@@ -79,26 +80,24 @@ export default function EntryEditor({ dateKey }) {
                   : 'bg-border'
             }`}
           />
-          {status === 'saving'
-            ? 'Saving…'
-            : status === 'saved'
-              ? 'Saved'
-              : 'Autosaves as you write'}
+          <span className="sm:hidden">{status === 'saving' ? 'Saving' : status === 'saved' ? 'Saved' : 'Auto-save on'}</span>
+          <span className="hidden sm:inline">{status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : 'Autosaves as you write'}</span>
           {encryptionEnabled && unlocked ? (
             <span
-              className="ml-1 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs"
+              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs"
               title="Entries are encrypted before they leave this device"
             >
               🔒 encrypted
             </span>
           ) : null}
-        </span>
+        </div>
       </div>
 
       <label htmlFor="entry-content" className="sr-only">
         Journal entry
       </label>
       <div className="overflow-hidden rounded-2xl border border-border shadow-card">
+        {/* Decorative top bar */}
         <div
           aria-hidden="true"
           className="flex h-8 items-center gap-1.5 border-b border-border bg-surface-2/50 px-4"
@@ -117,9 +116,12 @@ export default function EntryEditor({ dateKey }) {
               ? 'What stayed with you today?'
               : `What happened on ${formatEntryDate(dateKey)}?`
           }
-          className="editor-paper min-h-72 w-full resize-y px-5 py-4 text-lg leading-10 text-ink outline-none ring-accent/30 placeholder:text-faint focus:ring-4"
+          className="editor-paper min-h-[28rem] w-full resize-y px-5 py-4 text-lg sm:text-xl leading-10 sm:leading-12 text-ink outline-none ring-accent/30 placeholder:text-faint focus:ring-4"
+          rows={10}
         />
       </div>
+
+      {/* Save status is now shown above the text area — clearer for mobile */}
 
       <TaskList tasks={dayTasks} onSave={(list) => saveTasks(dateKey, list)} />
 
