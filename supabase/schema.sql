@@ -1,6 +1,15 @@
 -- ============================================================================
 -- Daily Ink — Supabase schema
 -- Run this in the Supabase SQL editor (Dashboard → SQL → New query).
+--
+-- USERNAME + PASSWORD SIGN-IN NOTES
+--   1. The app never asks for a real email. Accounts are created with a
+--      synthetic <username><timestamp>@dailyink.local address, so you MUST
+--      disable "Confirm email": Dashboard → Authentication → Providers →
+--      Email → uncheck "Confirm email". Otherwise sign-in fails with
+--      "Email not confirmed".
+--   2. Profiles store the username (unique) and the synthetic email (unique)
+--      so sign-in can resolve username → email before authenticating.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -10,12 +19,19 @@
 -- User profile / preferences (created automatically on signup by trigger)
 create table if not exists public.profiles (
   id            uuid primary key references auth.users (id) on delete cascade,
+  username      text unique,
+  email         text unique,
   display_name  text,
   theme         text not null default 'system',
   lock_enabled  boolean not null default false,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
+
+-- Upgrade path for projects created before username sign-in existed: adds
+-- the username/email columns if profiles already exists without them.
+alter table public.profiles add column if not exists username text unique;
+alter table public.profiles add column if not exists email    text unique;
 
 -- One journal entry per day. Content may be client-side encrypted.
 create table if not exists public.entries (
@@ -71,52 +87,71 @@ alter table public.entries  enable row level security;
 alter table public.tasks    enable row level security;
 alter table public.reviews  enable row level security;
 
--- Profiles: users can read/update only their own row
-create policy "profiles_select_own" on public.profiles
-  for select using (auth.uid() = id);
+-- Profiles: readable by anyone (including signed-out visitors) so the app
+-- can resolve username -> sign-in email before authenticating. Safe because
+-- profiles.email is a synthetic <username><timestamp>@dailyink.local address
+-- generated at signup — the user's real email is never stored here. Writes
+-- remain owner-only.
+drop policy if exists "profiles_select_for_signin" on public.profiles;
+create policy "profiles_select_for_signin" on public.profiles
+  for select using (true);
 
+drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
   for insert with check (auth.uid() = id);
 
+drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own" on public.profiles
   for update using (auth.uid() = id) with check (auth.uid() = id);
 
 -- Entries: full CRUD scoped to the owner
+drop policy if exists "entries_select_own" on public.entries;
 create policy "entries_select_own" on public.entries
   for select using (auth.uid() = user_id);
 
+drop policy if exists "entries_insert_own" on public.entries;
 create policy "entries_insert_own" on public.entries
   for insert with check (auth.uid() = user_id);
 
+drop policy if exists "entries_update_own" on public.entries;
 create policy "entries_update_own" on public.entries
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "entries_delete_own" on public.entries;
 create policy "entries_delete_own" on public.entries
   for delete using (auth.uid() = user_id);
 
 -- Tasks: full CRUD scoped to the owner
+drop policy if exists "tasks_select_own" on public.tasks;
 create policy "tasks_select_own" on public.tasks
   for select using (auth.uid() = user_id);
 
+drop policy if exists "tasks_insert_own" on public.tasks;
 create policy "tasks_insert_own" on public.tasks
   for insert with check (auth.uid() = user_id);
 
+drop policy if exists "tasks_update_own" on public.tasks;
 create policy "tasks_update_own" on public.tasks
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "tasks_delete_own" on public.tasks;
 create policy "tasks_delete_own" on public.tasks
   for delete using (auth.uid() = user_id);
 
 -- Reviews: full CRUD scoped to the owner
+drop policy if exists "reviews_select_own" on public.reviews;
 create policy "reviews_select_own" on public.reviews
   for select using (auth.uid() = user_id);
 
+drop policy if exists "reviews_insert_own" on public.reviews;
 create policy "reviews_insert_own" on public.reviews
   for insert with check (auth.uid() = user_id);
 
+drop policy if exists "reviews_update_own" on public.reviews;
 create policy "reviews_update_own" on public.reviews
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "reviews_delete_own" on public.reviews;
 create policy "reviews_delete_own" on public.reviews
   for delete using (auth.uid() = user_id);
 
@@ -124,7 +159,8 @@ create policy "reviews_delete_own" on public.reviews
 -- Triggers
 -- ----------------------------------------------------------------------------
 
--- Auto-create a profile row when a user signs up
+-- Auto-create a profile row when a user signs up, storing the chosen
+-- username and the synthetic sign-in email
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -132,10 +168,16 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, display_name)
+  insert into public.profiles (id, username, email, display_name)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1))
+    new.raw_user_meta_data ->> 'username',
+    new.email,
+    coalesce(
+      new.raw_user_meta_data ->> 'display_name',
+      new.raw_user_meta_data ->> 'username',
+      split_part(new.email, '@', 1)
+    )
   )
   on conflict (id) do nothing;
   return new;
@@ -220,15 +262,19 @@ create index if not exists routines_user_idx on public.routines (user_id);
 
 alter table public.routines enable row level security;
 
+drop policy if exists "routines_select_own" on public.routines;
 create policy "routines_select_own" on public.routines
   for select using (auth.uid() = user_id);
 
+drop policy if exists "routines_insert_own" on public.routines;
 create policy "routines_insert_own" on public.routines
   for insert with check (auth.uid() = user_id);
 
+drop policy if exists "routines_update_own" on public.routines;
 create policy "routines_update_own" on public.routines
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "routines_delete_own" on public.routines;
 create policy "routines_delete_own" on public.routines
   for delete using (auth.uid() = user_id);
 

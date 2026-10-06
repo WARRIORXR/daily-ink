@@ -23,46 +23,11 @@ function EyeIcon({ open = false, className = 'h-4 w-4' }) {
   )
 }
 
-function GoogleIcon({ className = 'h-4 w-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className}>
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-      />
-    </svg>
-  )
-}
-
 export default function AuthForm() {
-  const {
-    signIn,
-    signUp,
-    signInWithOtp,
-    signInWithOAuth,
-    resetPassword,
-    updatePassword,
-    isRecoveryMode,
-    setIsRecoveryMode,
-  } = useAuth()
+  const { signIn, signUp } = useAuth()
 
-  // modes: 'signin' | 'signup' | 'magiclink' | 'forgot' | 'reset'
-  const [internalMode, setInternalMode] = useState('signin')
-  const mode = isRecoveryMode ? 'reset' : internalMode
-  const [displayName, setDisplayName] = useState('')
-  const [email, setEmail] = useState('')
+  const [mode, setMode] = useState('signin')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState(null)
@@ -70,10 +35,7 @@ export default function AuthForm() {
   const [notice, setNotice] = useState(null)
 
   function switchMode(next) {
-    if (isRecoveryMode) {
-      setIsRecoveryMode(false)
-    }
-    setInternalMode(next)
+    setMode(next)
     setError(null)
     setNotice(null)
   }
@@ -86,41 +48,15 @@ export default function AuthForm() {
 
     try {
       if (mode === 'signin') {
-        const { error: signInError } = await signIn(email.trim(), password)
+        const { error: signInError } = await signIn(username.trim(), password)
         if (signInError) setError(signInError)
       } else if (mode === 'signup') {
-        const { error: signUpError, needsConfirmation } = await signUp(
-          email.trim(),
-          password,
-          displayName.trim(),
-        )
+        const { error: signUpError } = await signUp(username.trim(), password)
         if (signUpError) {
           setError(signUpError)
-        } else if (needsConfirmation) {
-          setNotice('Verification email sent! Check your inbox to confirm your account.')
-          switchMode('signin')
-        }
-      } else if (mode === 'magiclink') {
-        const { error: otpError } = await signInWithOtp(email.trim())
-        if (otpError) {
-          setError(otpError)
         } else {
-          setNotice('Magic link sent! Check your inbox to sign in with one click.')
-        }
-      } else if (mode === 'forgot') {
-        const { error: resetError } = await resetPassword(email.trim())
-        if (resetError) {
-          setError(resetError)
-        } else {
-          setNotice('Password reset email sent! Check your inbox for instructions.')
-        }
-      } else if (mode === 'reset') {
-        const { error: updateError } = await updatePassword(password)
-        if (updateError) {
-          setError(updateError)
-        } else {
-          setNotice('Password updated successfully! You can now sign in.')
-          switchMode('signin')
+          setNotice('Account created! You can now sign in.')
+          setMode('signin')
         }
       }
     } catch (err) {
@@ -130,39 +66,16 @@ export default function AuthForm() {
     }
   }
 
-  async function handleGoogleLogin() {
-    setError(null)
-    setNotice(null)
-    setBusy(true)
-    try {
-      const { error: oauthError } = await signInWithOAuth('google')
-      if (oauthError) {
-        setError(oauthError)
-      }
-      // OAuth redirects to Google and back — don't clear busy here.
-      // The app will reload / re-render when the session is set.
-    } catch (err) {
-      setError(err?.message || 'Failed to connect to Google.')
-      setBusy(false)
-    }
-  }
-
   return (
     <div className="w-full max-w-sm">
       <div className="text-center sm:text-left">
         <h1 className="font-display text-2xl text-ink">
-          {mode === 'signin' && 'Welcome back'}
-          {mode === 'signup' && 'Create your account'}
-          {mode === 'magiclink' && 'Magic link sign in'}
-          {mode === 'forgot' && 'Reset password'}
-          {mode === 'reset' && 'Set new password'}
+          {mode === 'signin' ? 'Welcome back' : 'Create your account'}
         </h1>
         <p className="mt-1 text-sm text-muted">
-          {mode === 'signin' && 'Sign in to sync your journal across your devices.'}
-          {mode === 'signup' && 'Your journal is private — only you can read it.'}
-          {mode === 'magiclink' && "We'll email you a passwordless sign-in link."}
-          {mode === 'forgot' && "Enter your email and we'll send a recovery link."}
-          {mode === 'reset' && 'Choose a secure new password for your account.'}
+          {mode === 'signin'
+            ? 'Sign in with your username and password.'
+            : "Pick a username — it's how you'll sign in every day."}
         </p>
       </div>
 
@@ -178,168 +91,76 @@ export default function AuthForm() {
         </div>
       ) : null}
 
-      {/* Social Logins (Google) — available for signin & signup */}
-      {(mode === 'signin' || mode === 'signup') && (
-        <div className="mt-5 space-y-3">
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={busy}
-            className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-surface-2 active:scale-[0.99] disabled:opacity-50 shadow-sm"
-          >
-            {busy && (
-              <svg
-                className="h-4.5 w-4.5 animate-spin"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-              </svg>
-            )}
-            <GoogleIcon className="h-4.5 w-4.5" />
-            Continue with Google
-          </button>
+      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <div>
+          <label htmlFor="auth-username" className="mb-1 block text-sm font-medium text-muted">
+            Username
+          </label>
+          <input
+            id="auth-username"
+            type="text"
+            autoComplete="username"
+            required
+            minLength={2}
+            placeholder="e.g. maya"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            className={inputClass}
+          />
+        </div>
 
-          {busy && (
-            <p className="text-xs text-faint text-center">
-              Redirecting to Google — coming right back to Daily Ink.
-            </p>
-          )}
-
-          <div className="flex items-center gap-2 my-4">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs uppercase tracking-wider text-faint">or continue with email</span>
-            <div className="h-px flex-1 bg-border" />
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <label htmlFor="auth-password" className="text-sm font-medium text-muted">
+              Password
+            </label>
+          </div>
+          <div className="relative">
+            <input
+              id="auth-password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+              required
+              minLength={6}
+              placeholder="At least 6 characters"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className={`${inputClass} pr-10`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-faint hover:text-ink transition"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              <EyeIcon open={showPassword} className="h-4 w-4" />
+            </button>
           </div>
         </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-        {mode === 'signup' && (
-          <div>
-            <label htmlFor="auth-display-name" className="mb-1 block text-sm font-medium text-muted">
-              Display Name (optional)
-            </label>
-            <input
-              id="auth-display-name"
-              type="text"
-              autoComplete="name"
-              placeholder="e.g. Maya"
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              className={inputClass}
-            />
-          </div>
-        )}
-
-        {mode !== 'reset' && (
-          <div>
-            <label htmlFor="auth-email" className="mb-1 block text-sm font-medium text-muted">
-              Email address
-            </label>
-            <input
-              id="auth-email"
-              type="email"
-              autoComplete="email"
-              required
-              placeholder="you@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className={inputClass}
-            />
-          </div>
-        )}
-
-        {mode !== 'magiclink' && mode !== 'forgot' && (
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label htmlFor="auth-password" className="text-sm font-medium text-muted">
-                {mode === 'reset' ? 'New Password' : 'Password'}
-              </label>
-              {mode === 'signin' && (
-                <button
-                  type="button"
-                  onClick={() => switchMode('forgot')}
-                  className="text-xs text-accent hover:underline"
-                >
-                  Forgot password?
-                </button>
-              )}
-            </div>
-            <div className="relative">
-              <input
-                id="auth-password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                required
-                minLength={6}
-                placeholder="At least 6 characters"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className={`${inputClass} pr-10`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-faint hover:text-ink transition"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                <EyeIcon open={showPassword} className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
 
         <button
           type="submit"
           disabled={busy}
           className="w-full rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-on-accent transition hover:opacity-90 disabled:opacity-50 shadow-sm"
         >
-          {busy
-            ? 'Please wait…'
-            : mode === 'signin'
-              ? 'Sign in'
-              : mode === 'signup'
-                ? 'Create account'
-                : mode === 'magiclink'
-                  ? 'Send Magic Link'
-                  : mode === 'forgot'
-                    ? 'Send Reset Link'
-                    : 'Update Password'}
+          {busy ? 'Please wait...' : mode === 'signin' ? 'Sign in' : 'Create account'}
         </button>
       </form>
 
       {/* Mode navigation links */}
       <div className="mt-5 space-y-2 text-center text-sm text-muted">
-        {mode === 'signin' && (
-          <>
-            <div>
-              New here?{' '}
-              <button
-                type="button"
-                onClick={() => switchMode('signup')}
-                className="font-medium text-accent underline-offset-2 hover:underline"
-              >
-                Create an account
-              </button>
-            </div>
-            <div>
-              Prefer passwordless?{' '}
-              <button
-                type="button"
-                onClick={() => switchMode('magiclink')}
-                className="text-accent underline-offset-2 hover:underline"
-              >
-                Email me a Magic Link
-              </button>
-            </div>
-          </>
-        )}
-
-        {mode === 'signup' && (
+        {mode === 'signin' ? (
+          <div>
+            New here?{' '}
+            <button
+              type="button"
+              onClick={() => switchMode('signup')}
+              className="font-medium text-accent underline-offset-2 hover:underline"
+            >
+              Create an account
+            </button>
+          </div>
+        ) : (
           <div>
             Already have an account?{' '}
             <button
@@ -351,21 +172,7 @@ export default function AuthForm() {
             </button>
           </div>
         )}
-
-        {(mode === 'magiclink' || mode === 'forgot' || mode === 'reset') && (
-          <div>
-            Remembered your credentials?{' '}
-            <button
-              type="button"
-              onClick={() => switchMode('signin')}
-              className="font-medium text-accent underline-offset-2 hover:underline"
-            >
-              Back to sign in
-            </button>
-          </div>
-        )}
       </div>
-
     </div>
   )
 }
