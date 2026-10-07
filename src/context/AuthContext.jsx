@@ -4,10 +4,103 @@ import { isSupabaseConfigured, supabase } from '../config/supabaseClient'
 const AuthContext = createContext(null)
 const GUEST_KEY = 'daily_ink_guest_mode'
 
+// Supabase and Postgres word their errors for developers ("column
+// profiles.email does not exist"). Translate the ones a journal-keeper can act
+// on, and pass the rest through untranslated so real problems stay visible.
+// The raw text always reaches the audit log, where it is useful.
+function friendlyAuthError(message) {
+  const raw = message ?? ''
+  if (/column .* does not exist|relation .* does not exist|schema cache/i.test(raw)) {
+    return 'Your Supabase project is missing the latest schema. Open the SQL editor, run supabase/schema.sql, then try again.'
+  }
+  if (/email not confirmed/i.test(raw)) {
+    return 'This account still needs email confirmation. In Supabase, turn off "Confirm email" (Authentication -> Providers -> Email), then sign in again.'
+  }
+  if (/invalid login credentials/i.test(raw)) {
+    return 'Wrong username or password.'
+  }
+  if (/user already registered|duplicate key/i.test(raw)) {
+    return 'That username is already taken.'
+  }
+  if (/password should be at least/i.test(raw)) {
+    return 'Passwords need at least 6 characters.'
+  }
+  return raw || 'Something went wrong. Please try again.'
+}
+
+// Append an entry to the sign-in audit trail. Logging is best-effort: it must
+// never stop someone from signing in, so every failure is swallowed (an older
+// project without the login_events table, a flaky network, a blocked insert).
+// No password is ever recorded — Supabase hashes it server-side, so a
+// plaintext password does not exist anywhere in this app.
+async function logLoginEvent({ username, userId = null, event, success, reason = null }) {
+  if (!supabase) return
+  try {
+    await supabase.from('login_events').insert({
+      username: (username ?? '').slice(0, 64),
+      user_id: userId,
+      event,
+      success,
+      reason,
+      user_agent:
+        typeof navigator === 'undefined' ? null : navigator.userAgent.slice(0, 300),
+    })
+  } catch {
+    /* never block authentication on a logging failure */
+  }
+}
+
+// Resolve a username to the synthetic sign-in email. Prefers the
+// security-definer RPC (which lets profiles stay owner-readable) and falls
+// back to a direct read for projects that haven't run the latest schema.sql.
+async function resolveLoginEmail(username) {
+  const { data, error } = await supabase.rpc('resolve_login_email', {
+    p_username: username,
+  })
+  if (!error) {
+    return { email: typeof data === 'string' && data ? data : null, error: null }
+  }
+
+  const { data: profile, error: lookupError } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('username', username)
+    .single()
+  // PGRST116 = no rows found — treat as "user not found"
+  if (lookupError && lookupError.code !== 'PGRST116') {
+    return { email: null, error: lookupError.message }
+  }
+  return { email: profile?.email ?? null, error: null }
+}
+
+// Friendly "is this username free?" check for signup.
+// On an unexpected failure we optimistically report it as available and let
+// the unique constraint on profiles.username be the real backstop.
+async function isUsernameAvailable(username) {
+  const { data, error } = await supabase.rpc('username_available', {
+    p_username: username,
+  })
+  if (!error) return { available: data !== false, error: null }
+
+  const { data: existing, error: readError } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('username', username)
+    .maybeSingle()
+  if (readError) return { available: true, error: readError.message }
+  return { available: !existing, error: null }
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(isSupabaseConfigured)
   const [error, setError] = useState(null)
+  // Admin flag keyed by user id so it can never leak across sign-ins.
+  const [adminState, setAdminState] = useState({
+    userId: null,
+    isAdmin: false,
+    checked: false,
+  })
   const [_isGuest, setIsGuest] = useState(() => {
     try {
       return localStorage.getItem(GUEST_KEY) === 'true'
@@ -63,6 +156,35 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  // Load the admin flag for the signed-in user. Fails soft on projects that
+  // haven't run the latest schema.sql (no is_admin column) — everyone is simply
+  // treated as a normal user, and /admin stays locked.
+  useEffect(() => {
+    const userId = session?.user?.id
+    if (!supabase || !userId) return undefined
+
+    let active = true
+    supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) {
+          setAdminState({ userId, isAdmin: Boolean(data?.is_admin), checked: true })
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAdminState({ userId, isAdmin: false, checked: true })
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [session?.user?.id])
+
   const exitGuestMode = useCallback(() => {
     setIsGuest(false)
     try {
@@ -79,36 +201,56 @@ export function AuthProvider({ children }) {
       if (!supabase) {
         return { error: 'Supabase is not configured yet. Add your project credentials in .env.local' }
       }
+      const clean = username.trim()
       try {
-        // Find the user's email by username from the profiles table
-        const { data: profile, error: lookupError } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('username', username.trim())
-          .single()
-
-        if (lookupError && lookupError.code !== 'PGRST116') {
-          // PGRST116 = no rows found — treat as "user not found"
-          setError(lookupError.message)
-          return { error: lookupError.message }
+        // Resolve the username to the account's sign-in email
+        const { email, error: lookupError } = await resolveLoginEmail(clean)
+        if (lookupError) {
+          setError(friendlyAuthError(lookupError))
+          await logLoginEvent({
+            username: clean,
+            event: 'sign_in',
+            success: false,
+            reason: `lookup failed: ${lookupError}`,
+          })
+          return { error: friendlyAuthError(lookupError) }
         }
 
-        if (!profile) {
-          setError('No account found with that username.')
-          return { error: 'No account found with that username.' }
+        if (!email) {
+          const msg = 'No account found with that username.'
+          setError(msg)
+          await logLoginEvent({
+            username: clean,
+            event: 'sign_in',
+            success: false,
+            reason: 'unknown username',
+          })
+          return { error: msg }
         }
 
-        // Sign in with Supabase Auth using the found email
+        // Sign in with Supabase Auth using the resolved email
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email: profile.email,
+          email,
           password,
         })
         if (signInError) {
-          setError(signInError.message)
-          return { error: signInError.message }
+          setError(friendlyAuthError(signInError.message))
+          await logLoginEvent({
+            username: clean,
+            event: 'sign_in',
+            success: false,
+            reason: signInError.message,
+          })
+          return { error: friendlyAuthError(signInError.message) }
         }
         setSession(data.session)
         exitGuestMode()
+        await logLoginEvent({
+          username: clean,
+          userId: data.session?.user?.id ?? null,
+          event: 'sign_in',
+          success: true,
+        })
         return { error: null }
       } catch (err) {
         const msg =
@@ -134,12 +276,8 @@ export function AuthProvider({ children }) {
       try {
         // Friendly early check for taken usernames. The unique constraint on
         // profiles.username is the real backstop if this check races.
-        const { data: existing } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('username', clean)
-          .maybeSingle()
-        if (existing) {
+        const { available, error: checkError } = await isUsernameAvailable(clean)
+        if (!available && !checkError) {
           const msg = 'That username is already taken.'
           setError(msg)
           return { error: msg }
@@ -156,8 +294,14 @@ export function AuthProvider({ children }) {
           },
         })
         if (signUpError) {
-          setError(signUpError.message)
-          return { error: signUpError.message }
+          setError(friendlyAuthError(signUpError.message))
+          await logLoginEvent({
+            username: clean,
+            event: 'sign_up',
+            success: false,
+            reason: signUpError.message,
+          })
+          return { error: friendlyAuthError(signUpError.message) }
         }
 
         // The trigger will create the profile row. If signUp returned a session,
@@ -166,6 +310,12 @@ export function AuthProvider({ children }) {
           setSession(data.session)
           exitGuestMode()
         }
+        await logLoginEvent({
+          username: clean,
+          userId: data.user?.id ?? null,
+          event: 'sign_up',
+          success: true,
+        })
         return { error: null }
       } catch (err) {
         const msg =
@@ -181,6 +331,13 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     setError(null)
+    const current = session?.user
+    await logLoginEvent({
+      username: current?.user_metadata?.username ?? current?.email ?? '',
+      userId: current?.id ?? null,
+      event: 'sign_out',
+      success: true,
+    })
     if (supabase) {
       try {
         await supabase.auth.signOut()
@@ -190,7 +347,7 @@ export function AuthProvider({ children }) {
     }
     setSession(null)
     exitGuestMode()
-  }, [exitGuestMode])
+  }, [exitGuestMode, session?.user])
 
   // Mode resolution:
   // - 'local'  : Supabase is NOT configured (no credentials) — offline/local-only mode
@@ -203,8 +360,23 @@ export function AuthProvider({ children }) {
         ? 'server'
         : 'guest'
 
+  // The username the user picked at signup. Falls back to the local part of the
+  // synthetic address so the UI never has to show "name1789…@dailyink.local".
+  const username =
+    session?.user?.user_metadata?.username ??
+    (session?.user?.email ? session.user.email.split('@')[0] : null)
+
+  const currentUserId = session?.user?.id ?? null
+  const isAdmin =
+    adminState.checked && adminState.userId === currentUserId ? adminState.isAdmin : false
+  // True only while we are still fetching the flag for the current user.
+  const adminLoading = Boolean(currentUserId) && adminState.userId !== currentUserId
+
   const value = {
     user: session?.user ?? null,
+    username,
+    isAdmin,
+    adminLoading,
     loading,
     error,
     configured: isSupabaseConfigured,

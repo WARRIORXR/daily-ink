@@ -24,6 +24,13 @@ export function formatQuizDate(date) {
   return format(value, 'MMM d, yyyy')
 }
 
+/** Precise timestamp for audit-style lists (login activity). */
+export function formatTimestamp(value) {
+  const date = value instanceof Date ? value : parseISO(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return format(date, 'MMM d, yyyy HH:mm:ss')
+}
+
 export function getEntryKey(date = new Date()) {
   return format(date, KEY_FORMAT)
 }

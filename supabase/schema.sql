@@ -10,6 +10,17 @@
 --      "Email not confirmed".
 --   2. Profiles store the username (unique) and the synthetic email (unique)
 --      so sign-in can resolve username → email before authenticating.
+--   3. Signed-out visitors resolve a username to its sign-in email through the
+--      public.resolve_login_email() function below, NOT by reading profiles.
+--      profiles itself stays readable by its owner only.
+--   4. Every sign-in attempt is appended to public.login_events. The log stores
+--      the username, time, result and device — never the password (Supabase
+--      hashes passwords server-side, so no plaintext password ever exists in
+--      this project). Only admins can read it.
+--   5. To make yourself an admin, run this once with your own username:
+--        update public.profiles set is_admin = true where username = 'yourname';
+--      You may need to sign up in the app first. The is_admin flag cannot be
+--      set from the app itself (see profiles_protect_admin below).
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -22,6 +33,7 @@ create table if not exists public.profiles (
   username      text unique,
   email         text unique,
   display_name  text,
+  is_admin      boolean not null default false,
   theme         text not null default 'system',
   lock_enabled  boolean not null default false,
   created_at    timestamptz not null default now(),
@@ -32,6 +44,7 @@ create table if not exists public.profiles (
 -- the username/email columns if profiles already exists without them.
 alter table public.profiles add column if not exists username text unique;
 alter table public.profiles add column if not exists email    text unique;
+alter table public.profiles add column if not exists is_admin boolean not null default false;
 
 -- One journal entry per day. Content may be client-side encrypted.
 create table if not exists public.entries (
@@ -87,14 +100,16 @@ alter table public.entries  enable row level security;
 alter table public.tasks    enable row level security;
 alter table public.reviews  enable row level security;
 
--- Profiles: readable by anyone (including signed-out visitors) so the app
--- can resolve username -> sign-in email before authenticating. Safe because
--- profiles.email is a synthetic <username><timestamp>@dailyink.local address
--- generated at signup — the user's real email is never stored here. Writes
--- remain owner-only.
+-- Profiles: readable by the owner only. Signed-out visitors never need to
+-- read this table — they resolve username -> sign-in email through
+-- public.resolve_login_email(), a security-definer function defined further
+-- down. (An older revision of this file allowed public SELECT; the drop below
+-- removes that policy on projects that already ran it.)
 drop policy if exists "profiles_select_for_signin" on public.profiles;
-create policy "profiles_select_for_signin" on public.profiles
-  for select using (true);
+
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own" on public.profiles
+  for select using (auth.uid() = id);
 
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
@@ -288,3 +303,129 @@ begin
   alter publication supabase_realtime add table public.routines;
 exception when duplicate_object then null;
 end $$;
+
+-- ============================================================================
+-- Admin & login activity
+-- ============================================================================
+
+-- Concurrency-safe lookup of a username's sign-in email.
+-- SECURITY DEFINER so it can read profiles even though the profiles SELECT
+-- policy is owner-only, and so it bypasses the RLS check for signed-out
+-- visitors. It returns nothing but the synthetic address, and never exposes
+-- any other profile column, so it is safe to expose to anon.
+create or replace function public.resolve_login_email(p_username text)
+returns text
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select p.email
+  from public.profiles p
+  where p.username = btrim(p_username)
+  limit 1;
+$$;
+
+grant execute on function public.resolve_login_email(text) to anon, authenticated;
+
+-- True when the signed-in user is flagged as an admin. SECURITY DEFINER so the
+-- login_events policies below can call it without recursing into the profiles
+-- policy, and STABLE so Postgres can cache it per statement.
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select coalesce(
+    (select p.is_admin from public.profiles p where p.id = auth.uid()),
+    false
+  );
+$$;
+
+grant execute on function public.is_admin() to anon, authenticated;
+
+-- True when no profile has claimed this username yet. Used for a friendly
+-- "that username is taken" message at signup; the unique constraint on
+-- profiles.username remains the real backstop if two signups race.
+create or replace function public.username_available(p_username text)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select not exists (
+    select 1 from public.profiles p where p.username = btrim(p_username)
+  );
+$$;
+
+grant execute on function public.username_available(text) to anon, authenticated;
+
+-- Refuse to let a normal signed-in user promote themselves. The app can update
+-- its own profile row (theme, display name…), so without this guard anybody
+-- could set is_admin = true and read the whole login log. The SQL editor has no
+-- auth.uid(), so you can still set the flag by hand there.
+create or replace function public.protect_admin_flag()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.is_admin is distinct from old.is_admin
+     and auth.uid() is not null
+     and not public.is_admin()
+  then
+    new.is_admin := old.is_admin;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_protect_admin on public.profiles;
+create trigger profiles_protect_admin
+  before update on public.profiles
+  for each row execute function public.protect_admin_flag();
+
+-- Append-only audit trail of sign-in activity. Deliberately stores no
+-- password: Supabase Auth hashes passwords server-side, so a plaintext
+-- password is never available to the app (or to this table).
+create table if not exists public.login_events (
+  id          uuid primary key default gen_random_uuid(),
+  username    text not null default '' check (char_length(username) <= 64),
+  user_id     uuid references auth.users (id) on delete set null,
+  event       text not null default 'sign_in' check (event in ('sign_in', 'sign_up', 'sign_out')),
+  success     boolean not null default false,
+  reason      text,
+  user_agent  text,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists login_events_created_idx on public.login_events (created_at desc);
+create index if not exists login_events_username_idx on public.login_events (lower(username), created_at desc);
+
+alter table public.login_events enable row level security;
+
+-- Anyone (including a signed-out visitor whose password was wrong) may append
+-- an attempt, otherwise failed logins could not be recorded at all.
+drop policy if exists "login_events_insert_any" on public.login_events;
+create policy "login_events_insert_any" on public.login_events
+  for insert with check (true);
+
+-- Only admins may read or clear the log. There is intentionally no UPDATE
+-- policy: entries are append-only.
+drop policy if exists "login_events_select_admin" on public.login_events;
+create policy "login_events_select_admin" on public.login_events
+  for select using (public.is_admin());
+
+drop policy if exists "login_events_delete_admin" on public.login_events;
+create policy "login_events_delete_admin" on public.login_events
+  for delete using (public.is_admin());
+
+-- ============================================================================
+-- Make yourself an admin (run this after you have signed up in the app):
+--   update public.profiles set is_admin = true where username = 'yourname';
+-- Then open /admin. The flag can only be set from here, never from the app.
+-- ============================================================================

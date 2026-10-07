@@ -36,7 +36,9 @@ export function InkMark({ className = 'h-5 w-5' }) {
 }
 
 export default function Navbar() {
-  const { user } = useAuth()
+  const { user, username, isAdmin } = useAuth()
+  // Admins get an extra tab; nobody else can reach /admin anyway.
+  const links = isAdmin ? [...LINKS, { to: '/admin', label: 'Admin' }] : LINKS
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/85 backdrop-blur">
@@ -55,7 +57,7 @@ export default function Navbar() {
 
           <nav aria-label="Main" className="flex min-w-0 items-center gap-2">
             <div className="no-scrollbar -mx-1 flex items-center gap-1 overflow-x-auto px-1">
-              {LINKS.map((link) => (
+              {links.map((link) => (
                 <NavLink key={link.to} to={link.to} end={link.end} className={linkClass}>
                   {link.label}
                 </NavLink>
@@ -66,11 +68,11 @@ export default function Navbar() {
               {user ? (
                 <Link
                   to="/settings"
-                  aria-label={`Signed in as ${user.email}`}
-                  title={user.email}
+                  aria-label={username ? `Signed in as ${username}` : 'Account settings'}
+                  title={username ? `Signed in as ${username}` : 'Account settings'}
                   className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border bg-surface text-sm font-medium text-accent"
                 >
-                  {(user.email?.[0] ?? '?').toUpperCase()}
+                  {(username?.[0] ?? '?').toUpperCase()}
                 </Link>
               ) : (
                 <Link
