@@ -11,11 +11,16 @@ const LINKS = [
   { to: '/settings', label: 'Settings' },
 ]
 
-const linkClass = ({ isActive }) =>
-  `whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition ${
+const pillClass = ({ isActive }) =>
+  `block whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition ${
     isActive
-      ? 'bg-ink text-bg shadow-sm'
+      ? 'bg-accent text-on-accent shadow-sm'
       : 'text-muted hover:bg-surface-2 hover:text-ink'
+  }`
+
+const compactPillClass = ({ isActive }) =>
+  `block whitespace-nowrap rounded-full px-3 py-1.5 text-xs transition ${
+    isActive ? 'bg-accent text-on-accent shadow-sm' : 'text-muted hover:bg-surface-2 hover:text-ink'
   }`
 
 export function InkMark({ className = 'h-5 w-5' }) {
@@ -41,50 +46,62 @@ export default function Navbar() {
   const links = isAdmin ? [...LINKS, { to: '/admin', label: 'Admin' }] : LINKS
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-bg/85 backdrop-blur">
-      <div className="mx-auto max-w-4xl px-4">
+    <header className="sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur-md">
+      <div className="mx-auto w-full max-w-5xl px-4">
         <div className="flex items-center justify-between gap-3 py-3">
           <Link
             to="/"
-            className="flex shrink-0 items-center gap-2 whitespace-nowrap text-ink"
+            className="flex shrink-0 items-center gap-2.5 text-ink"
             aria-label="Daily Ink home"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-accent text-on-accent shadow-sm">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-on-accent shadow-sm">
               <InkMark className="h-4.5 w-4.5" />
             </span>
             <span className="font-display text-lg tracking-tight sm:text-xl">Daily Ink</span>
           </Link>
 
-          <nav aria-label="Main" className="flex min-w-0 items-center gap-2">
-            <div className="no-scrollbar -mx-1 flex items-center gap-1 overflow-x-auto px-1">
-              {links.map((link) => (
-                <NavLink key={link.to} to={link.to} end={link.end} className={linkClass}>
-                  {link.label}
-                </NavLink>
-              ))}
-            </div>
-            <div className="ml-1 flex shrink-0 items-center gap-1.5">
-              <ThemeToggle />
-              {user ? (
-                <Link
-                  to="/settings"
-                  aria-label={username ? `Signed in as ${username}` : 'Account settings'}
-                  title={username ? `Signed in as ${username}` : 'Account settings'}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border bg-surface text-sm font-medium text-accent"
-                >
-                  {(username?.[0] ?? '?').toUpperCase()}
-                </Link>
-              ) : (
-                <Link
-                  to="/login"
-                  className="whitespace-nowrap rounded-full bg-accent px-3.5 py-1.5 text-xs sm:text-sm font-medium text-on-accent transition hover:opacity-90 shadow-sm"
-                >
-                  Sign in
-                </Link>
-              )}
-            </div>
-          </nav>
+          <div className="flex shrink-0 items-center gap-2">
+            <nav aria-label="Main" className="hidden md:block">
+              <ul className="flex items-center gap-0.5 rounded-full border border-border bg-surface/70 p-1 shadow-card">
+                {links.map((link) => (
+                  <li key={link.to}>
+                    <NavLink to={link.to} end={link.end} className={pillClass}>
+                      {link.label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            <ThemeToggle />
+
+            {user ? (
+              <Link
+                to="/settings"
+                aria-label={username ? `Signed in as ${username}` : 'Account settings'}
+                title={username ? `Signed in as ${username}` : 'Account settings'}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border bg-surface text-sm font-medium text-accent transition hover:border-accent/50"
+              >
+                {(username?.[0] ?? '?').toUpperCase()}
+              </Link>
+            ) : (
+              <Link
+                to="/login"
+                className="whitespace-nowrap rounded-full bg-accent px-3.5 py-1.5 text-sm font-medium text-on-accent shadow-sm transition hover:opacity-90"
+              >
+                Sign in
+              </Link>
+            )}
+          </div>
         </div>
+
+        <nav aria-label="Main" className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1 pb-3 md:hidden">
+          {links.map((link) => (
+            <NavLink key={link.to} to={link.to} end={link.end} className={compactPillClass}>
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
       </div>
     </header>
   )

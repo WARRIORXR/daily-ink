@@ -19,6 +19,15 @@ const rawKey =
 export const supabaseUrl = rawUrl.trim()
 export const supabaseAnonKey = rawKey.trim()
 
+// Sign-in is username + password, so every account gets a synthetic address
+// built from the username plus this domain. It must survive Supabase's own
+// address validation, which rejects reserved names outright — a .local address
+// is refused with "Email address ... is invalid". Override per project with
+// VITE_AUTH_EMAIL_DOMAIN. No mail is ever delivered here: with "Confirm email"
+// switched off (required for username sign-in) Supabase sends nothing at all.
+export const authEmailDomain =
+  (import.meta.env.VITE_AUTH_EMAIL_DOMAIN || 'dailyink.app').trim().replace(/^@/, '')
+
 // Consider configured only if non-empty and not the default placeholder
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
