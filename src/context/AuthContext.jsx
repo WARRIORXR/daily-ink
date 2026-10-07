@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { isSupabaseConfigured, supabase } from '../config/supabaseClient'
+import { authEmailDomain, isSupabaseConfigured, supabase } from '../config/supabaseClient'
 
 const AuthContext = createContext(null)
 const GUEST_KEY = 'daily_ink_guest_mode'
@@ -24,6 +24,15 @@ function friendlyAuthError(message) {
   }
   if (/password should be at least/i.test(raw)) {
     return 'Passwords need at least 6 characters.'
+  }
+  if (/email_address_invalid|is invalid/i.test(raw)) {
+    return 'Supabase rejected the generated sign-in address. Set VITE_AUTH_EMAIL_DOMAIN to a domain Supabase accepts (it refuses reserved names such as .local).'
+  }
+  if (/rate limit/i.test(raw)) {
+    return 'Supabase is rate-limiting confirmation emails, which means "Confirm email" is still on. Turn it off (Authentication -> Providers -> Email) and try again in a few minutes.'
+  }
+  if (/email not confirmed|confirm/i.test(raw)) {
+    return 'Turn off "Confirm email" in Supabase (Authentication -> Providers -> Email) so username accounts can sign in.'
   }
   return raw || 'Something went wrong. Please try again.'
 }
@@ -283,8 +292,12 @@ export function AuthProvider({ children }) {
           return { error: msg }
         }
 
-        // Generate a unique email from the username so Supabase Auth accepts it
-        const email = `${clean.toLowerCase().replace(/[^a-z0-9]/g, '')}${Date.now()}@dailyink.local`
+        // Generate a unique address from the username so Supabase Auth accepts
+        // it. The local part is stripped to [a-z0-9] and never left empty, and
+        // the domain comes from authEmailDomain (see supabaseClient.js) because
+        // Supabase refuses reserved names like .local.
+        const localPart = clean.toLowerCase().replace(/[^a-z0-9]/g, '') || 'user'
+        const email = `${localPart}${Date.now()}@${authEmailDomain}`
 
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
@@ -316,7 +329,9 @@ export function AuthProvider({ children }) {
           event: 'sign_up',
           success: true,
         })
-        return { error: null }
+        // No session means the project still has "Confirm email" switched on.
+        // The account exists but cannot sign in, so tell the form to explain.
+        return { error: null, needsConfirmation: !data.session }
       } catch (err) {
         const msg =
           err?.message?.includes('Failed to fetch') || err?.message?.includes('ENOTFOUND')
@@ -361,7 +376,7 @@ export function AuthProvider({ children }) {
         : 'guest'
 
   // The username the user picked at signup. Falls back to the local part of the
-  // synthetic address so the UI never has to show "name1789…@dailyink.local".
+  // synthetic address so the UI never has to show "name1789...@dailyink.app".
   const username =
     session?.user?.user_metadata?.username ??
     (session?.user?.email ? session.user.email.split('@')[0] : null)

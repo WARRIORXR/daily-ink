@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import EmptyState from '../components/EmptyState'
 import EntryCard from '../components/EntryCard'
+import PageHeader from '../components/PageHeader'
 import SearchFilters from '../components/SearchFilters'
 import Spinner from '../components/Spinner'
 import { useEncryption } from '../hooks/useEncryption'
@@ -64,13 +65,13 @@ export default function Entries() {
 
   return (
     <div className="animate-fade-up space-y-6">
-      <header>
-        <p className="font-hand text-2xl leading-none text-accent">all your pages</p>
-        <h1 className="mt-1 font-display text-3xl text-ink">Past entries</h1>
-        <p className="mt-1 text-sm text-muted">
-          {Object.keys(entries).length} page{Object.keys(entries).length === 1 ? '' : 's'} written
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="all your pages"
+        title="Past entries"
+        description={`${Object.keys(entries).length} page${
+          Object.keys(entries).length === 1 ? '' : 's'
+        } written - search, filter, and reread any of them.`}
+      />
 
       <SearchFilters filters={filters} onChange={setFilters} />
 

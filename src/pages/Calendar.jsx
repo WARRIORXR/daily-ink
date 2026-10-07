@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import CalendarView from '../components/CalendarView'
 import EmptyState from '../components/EmptyState'
+import PageHeader from '../components/PageHeader'
 import RoutineModal from '../components/RoutineModal'
 import { useEntries } from '../hooks/useEntries'
 import { useEntryContent } from '../hooks/useEntryContent'
@@ -31,27 +32,26 @@ export default function Calendar() {
 
   return (
     <div className="animate-fade-up space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="font-hand text-2xl leading-none text-accent">your memory map</p>
-          <h1 className="mt-1 font-display text-3xl text-ink">Calendar</h1>
-          <p className="mt-1 text-sm text-muted">Entries, streaks, and spaced routines at a glance.</p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setIsRoutineModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-xs sm:text-sm font-medium text-ink shadow-sm transition hover:border-accent/40 hover:bg-surface-2"
-        >
-          <span>✨</span>
-          <span>Routines & Intervals</span>
-          {routines.length > 0 && (
-            <span className="ml-1 rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold text-accent">
-              {routines.length}
-            </span>
-          )}
-        </button>
-      </header>
+      <PageHeader
+        eyebrow="your memory map"
+        title="Calendar"
+        description="Entries, streaks, and spaced routines at a glance."
+        actions={
+          <button
+            type="button"
+            onClick={() => setIsRoutineModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-medium text-ink shadow-sm transition hover:border-accent/40 hover:bg-surface-2 sm:text-sm"
+          >
+            <span aria-hidden="true">✨</span>
+            <span>Routines &amp; Intervals</span>
+            {routines.length > 0 && (
+              <span className="ml-1 rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold text-accent">
+                {routines.length}
+              </span>
+            )}
+          </button>
+        }
+      />
 
       {/* Monthly Calendar View */}
       <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">

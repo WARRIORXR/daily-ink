@@ -23,9 +23,14 @@ export default defineConfig(({ mode }) => {
     getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY') ||
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxeGF5dW9lcndidWFhYmVtcmFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzcxMTUsImV4cCI6MjEwNDU1MzExNX0.0qO0M7dDa_IpEziuAS5GXmXKyqoqRJV37dj2qWVZomc'
 
+  // Domain behind each account's synthetic sign-in address. Supabase refuses
+  // reserved names (.local/.test/.invalid), so this must look like a real domain.
+  const authEmailDomain = getEnv('VITE_AUTH_EMAIL_DOMAIN') || 'dailyink.app'
+
   return {
     plugins: [react(), tailwindcss()],
     define: {
+      'import.meta.env.VITE_AUTH_EMAIL_DOMAIN': JSON.stringify(authEmailDomain),
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
       'import.meta.env.SUPABASE_URL': JSON.stringify(supabaseUrl),

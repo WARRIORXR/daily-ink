@@ -23,6 +23,8 @@
 
   --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.05), 0 10px 28px -14px rgba(28, 25, 23, 0.14);
   --shadow-pop: 0 6px 16px -6px rgba(28, 25, 23, 0.18), 0 24px 48px -20px rgba(28, 25, 23, 0.28);
+  /* Soft inner highlight used on the auth panel and hero cards */
+  --shadow-glow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
   --animate-fade-in: fade-in 0.25s ease both;
   --animate-fade-up: fade-up 0.35s ease both;
@@ -185,6 +187,31 @@ body::after {
     color-mix(in srgb, var(--accent) 9%, transparent) 40px
   );
   background-attachment: local;
+}
+
+/* Warm radial wash — brand panel, hero cards, auth screens. */
+.paper-wash {
+  background-image:
+    radial-gradient(
+      120% 90% at 12% 0%,
+      color-mix(in srgb, var(--accent) 14%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      90% 70% at 100% 100%,
+      color-mix(in srgb, var(--clay) 12%, transparent) 0%,
+      transparent 60%
+    );
+}
+
+/* Thin gradient rule used under page titles. */
+.hairline {
+  height: 1px;
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--accent) 55%, transparent),
+    transparent
+  );
 }
 
 /* Drop cap for revealed memory entries. */

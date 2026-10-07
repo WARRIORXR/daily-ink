@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import PageHeader from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useToast } from '../context/ToastContext'
@@ -156,10 +157,11 @@ export default function Settings() {
 
   return (
     <div className="animate-fade-up space-y-6">
-      <header>
-        <p className="font-hand text-2xl leading-none text-accent">make it yours</p>
-        <h1 className="mt-1 font-display text-3xl text-ink">Settings</h1>
-      </header>
+      <PageHeader
+        eyebrow="make it yours"
+        title="Settings"
+        description="Account, appearance, encryption, app lock and exports."
+      />
 
       {/* Account & Sync */}
       <Section

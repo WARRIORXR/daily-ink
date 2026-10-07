@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import EmptyState from '../components/EmptyState'
+import PageHeader from '../components/PageHeader'
 import ReviewSession from '../components/ReviewSession'
 import Spinner from '../components/Spinner'
 import { useEntries } from '../hooks/useEntries'
@@ -25,7 +26,7 @@ export default function Review() {
   if (queue.length === 0) {
     return (
       <div className="animate-fade-up space-y-6">
-        <h1 className="font-display text-3xl text-ink">Review</h1>
+        <PageHeader eyebrow="spaced repetition" title="Review" />
         <EmptyState emoji="🌤️" title="All caught up">
           <p>
             No memories are due right now. Keep writing daily and revisit here — past pages
@@ -78,13 +79,11 @@ export default function Review() {
 
   return (
     <div className="animate-fade-up space-y-6">
-      <header>
-        <p className="font-hand text-2xl leading-none text-accent">spaced repetition</p>
-        <h1 className="mt-1 font-display text-3xl text-ink">Review</h1>
-        <p className="mt-1 text-sm text-muted">
-          {queue.length - index} of {queue.length} memories left
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="spaced repetition"
+        title="Review"
+        description={`${queue.length - index} of ${queue.length} memories left`}
+      />
       <ReviewSession
         key={item.dateKey}
         dateKey={item.dateKey}

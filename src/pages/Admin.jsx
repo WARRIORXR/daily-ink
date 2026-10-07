@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import EmptyState from '../components/EmptyState'
+import PageHeader from '../components/PageHeader'
 import Spinner from '../components/Spinner'
 import { supabase } from '../config/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -163,10 +164,7 @@ export default function Admin() {
   if (status === 'unavailable') {
     return (
       <div className="animate-fade-up space-y-6">
-        <header>
-          <p className="font-hand text-2xl leading-none text-accent">admin</p>
-          <h1 className="mt-1 font-display text-3xl text-ink">Login activity</h1>
-        </header>
+        <PageHeader eyebrow="admin" title="Login activity" />
         <EmptyState emoji="🗄️" title="Login log table not found">
           Run the latest supabase/schema.sql in your Supabase SQL editor to create the
           login_events table. Then sign out and back in so the first attempt is recorded.
@@ -178,10 +176,7 @@ export default function Admin() {
   if (status === 'error') {
     return (
       <div className="animate-fade-up space-y-6">
-        <header>
-          <p className="font-hand text-2xl leading-none text-accent">admin</p>
-          <h1 className="mt-1 font-display text-3xl text-ink">Login activity</h1>
-        </header>
+        <PageHeader eyebrow="admin" title="Login activity" />
         <div
           role="alert"
           className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
@@ -194,33 +189,35 @@ export default function Admin() {
 
   return (
     <div className="animate-fade-up space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="font-hand text-2xl leading-none text-accent">admin</p>
-          <h1 className="mt-1 font-display text-3xl text-ink">Login activity</h1>
-          <p className="mt-1 text-sm text-muted">
+      <PageHeader
+        eyebrow="admin"
+        title="Login activity"
+        description={
+          <>
             Signed in as <span className="text-ink">{username}</span>. Every sign-in, sign-up and
-            sign-out attempt is recorded here — usernames and times only, never passwords.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={load}
-            className="rounded-full border border-border px-4 py-1.5 text-xs text-muted transition hover:bg-surface-2 hover:text-ink sm:text-sm"
-          >
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={handleClear}
-            disabled={clearing || events.length === 0}
-            className="rounded-full border border-danger/40 px-4 py-1.5 text-xs text-danger transition hover:bg-danger/10 disabled:opacity-40 sm:text-sm"
-          >
-            {clearing ? 'Clearing...' : 'Clear log'}
-          </button>
-        </div>
-      </header>
+            sign-out attempt lands here - usernames and times only, never passwords.
+          </>
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={load}
+              className="rounded-full border border-border bg-surface px-4 py-1.5 text-xs text-muted transition hover:bg-surface-2 hover:text-ink sm:text-sm"
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={clearing || events.length === 0}
+              className="rounded-full border border-danger/40 bg-surface px-4 py-1.5 text-xs text-danger transition hover:bg-danger/10 disabled:opacity-40 sm:text-sm"
+            >
+              {clearing ? 'Clearing...' : 'Clear log'}
+            </button>
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Attempts" value={stats.total} />

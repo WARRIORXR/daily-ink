@@ -9,7 +9,8 @@ Write one page a day, track your streak, and let Daily Ink resurface old entries
 ## Features
 
 ### Core
-- **Auth** - username + password sign-in via Supabase Auth (no email address needed)
+- **Auth** - username + password sign-in via Supabase Auth (no email address needed, no OAuth)
+- **Admin login log** - admins get an `/admin` page listing every sign-in, sign-up and sign-out attempt with username, time, result and device (never passwords)
 - **Daily entry editor** — autosaving journal page per day, with mood tracking and a task list
 - **Calendar view** — month grid with dots for every written day, plus a day-detail panel
 - **Search & filters** — full-text search with date range, mood, and "has tasks" filters
@@ -55,7 +56,9 @@ SUPABASE_ANON_KEY=your-anon-key
 
 The anon key is safe for the browser; never use the `service_role` key here. `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are also accepted.
 
-4. **Turn off email confirmation.** Sign-in is username-based, and every account gets a synthetic `<username><timestamp>@dailyink.local` address that can never receive mail. In the dashboard go to **Authentication → Providers → Email** and uncheck **Confirm email**, otherwise every sign-in fails with "Email not confirmed".
+4. **Turn off email confirmation (required).** Sign-in is username-based, and every account gets a synthetic `<username><timestamp>@<authEmailDomain>` address that can never receive mail. In the dashboard go to **Authentication → Providers → Email** and uncheck **Confirm email**. While it is on, signup tries to send a confirmation email to an address that cannot receive one, so signups fail with `email rate limit exceeded` (Supabase throttles confirmation mail) and any account that does get created can never sign in. This is a hard requirement, not a nicety.
+
+The generated domain defaults to `dailyink.app` and can be overridden with `VITE_AUTH_EMAIL_DOMAIN`. Supabase rejects reserved names outright - `.local`, `.test`, `.invalid` and friends all fail with `Email address "..." is invalid`, which is why the default is a normal-looking domain.
 
 5. **Make yourself an admin (optional).** Sign up in the app once, then run this in the SQL editor:
 
