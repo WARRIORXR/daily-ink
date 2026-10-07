@@ -32,7 +32,9 @@ export const supabase = isSupabaseConfigured
       auth: {
         persistSession: true, // keep the session across reloads (localStorage)
         autoRefreshToken: true, // refresh before expiry, in the background
-        detectSessionInUrl: true, // pick up magic-link / email-confirm tokens
+        // Sign-in is username + password, so no tokens ever arrive in the URL.
+        // Left off deliberately: it keeps stray ?code= params from being consumed.
+        detectSessionInUrl: false,
       },
       // Realtime: keep channels alive across background tabs.
       realtime: {

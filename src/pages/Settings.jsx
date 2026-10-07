@@ -44,7 +44,7 @@ function Row({ label, children }) {
 }
 
 export default function Settings() {
-  const { user, signOut } = useAuth()
+  const { user, username, signOut } = useAuth()
   const { theme, setMode } = useTheme()
   const { toast } = useToast()
   const { entries, tasks } = useEntries()
@@ -171,13 +171,10 @@ export default function Settings() {
             <div className="space-y-0.5">
               <p className="text-sm font-medium text-ink">
                 {user ? (
-                  user.user_metadata?.display_name ? (
-                    <>
-                      {user.user_metadata.display_name} ({user.email})
-                    </>
-                  ) : (
-                    user.email
-                  )
+                  <>
+                    {user.user_metadata?.display_name || username}
+                    <span className="ml-2 text-xs font-normal text-faint">@{username}</span>
+                  </>
                 ) : (
                   'Local Mode (Offline)'
                 )}

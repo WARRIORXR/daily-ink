@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
+import RequireAdmin from './components/RequireAdmin'
 import RequireAuth from './components/RequireAuth'
+import Admin from './pages/Admin'
 import Calendar from './pages/Calendar'
 import Entries from './pages/Entries'
 import Home from './pages/Home'
@@ -27,6 +29,14 @@ export default function App() {
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/review" element={<Review />} />
         <Route path="/settings" element={<Settings />} />
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <Admin />
+            </RequireAdmin>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

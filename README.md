@@ -9,7 +9,7 @@ Write one page a day, track your streak, and let Daily Ink resurface old entries
 ## Features
 
 ### Core
-- **Auth** — email login/signup via Supabase Auth
+- **Auth** - username + password sign-in via Supabase Auth (no email address needed)
 - **Daily entry editor** — autosaving journal page per day, with mood tracking and a task list
 - **Calendar view** — month grid with dots for every written day, plus a day-detail panel
 - **Search & filters** — full-text search with date range, mood, and "has tasks" filters
@@ -45,7 +45,7 @@ Try the deployed version at **[daily-ink-three.vercel.app](https://daily-ink-thr
 Without Supabase credentials the app runs in **local mode** — everything stays in the browser. To enable cloud sync:
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `profiles`, `entries`, `tasks`, and `reviews` tables with RLS policies and signup triggers, and registers the tables with the Realtime publication (needed for live cross-device sync). The file is safe to re-run — everything is idempotent.
+2. Open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `profiles`, `entries`, `tasks`, `reviews`, `routines` and `login_events` tables with RLS policies and signup triggers, and registers the tables with the Realtime publication (needed for live cross-device sync). The file is safe to re-run - everything is idempotent.
 3. Copy `.env.example` to `.env.local` and fill in your project URL and anon key (Dashboard → Project Settings → API):
 
 ```
@@ -54,6 +54,18 @@ SUPABASE_ANON_KEY=your-anon-key
 ```
 
 The anon key is safe for the browser; never use the `service_role` key here. `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are also accepted.
+
+4. **Turn off email confirmation.** Sign-in is username-based, and every account gets a synthetic `<username><timestamp>@dailyink.local` address that can never receive mail. In the dashboard go to **Authentication → Providers → Email** and uncheck **Confirm email**, otherwise every sign-in fails with "Email not confirmed".
+
+5. **Make yourself an admin (optional).** Sign up in the app once, then run this in the SQL editor:
+
+```sql
+update public.profiles set is_admin = true where username = 'yourname';
+```
+
+Admins get an **Admin** tab with a login-activity page (`/admin`): every sign-in, sign-up and sign-out attempt with its username, time, device and result.
+
+> **Passwords are never recorded.** Supabase hashes passwords server-side, so no plaintext password exists anywhere in this project - the log intentionally stores usernames and timestamps only. The `is_admin` flag can only be set from the SQL editor: a database trigger stops the app from promoting itself, and row level security keeps the log readable by admins alone.
 
 ### 2. PWA icons (already generated)
 
@@ -89,7 +101,7 @@ src/
   components/            Layout, Navbar, EntryEditor, CalendarView,
                          MemoryQuiz, ReviewSession, OnThisDay, …
   pages/                 Home (dashboard), Journal, Entries, Calendar,
-                         Review, Settings, Login
+                         Review, Settings, Login, Admin (login activity)
 ```
 
 ## How live sync works
