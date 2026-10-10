@@ -9,7 +9,7 @@ Write one page a day, track your streak, and let Daily Ink resurface old entries
 ## Features
 
 ### Core
-- **Auth** - username + password sign-in via Supabase Auth (no email address needed, no OAuth)
+- **Auth** - username + password sign-in (no email address needed, no OAuth). Passwords are PBKDF2-hashed in the browser and stored in a `credentials` table; Supabase Auth issues the session behind the scenes using a synthetic internal address
 - **Admin login log** - admins get an `/admin` page listing every sign-in, sign-up and sign-out attempt with username, time, result and device (never passwords)
 - **Daily entry editor** — autosaving journal page per day, with mood tracking and a task list
 - **Calendar view** — month grid with dots for every written day, plus a day-detail panel
@@ -46,7 +46,7 @@ Try the deployed version at **[daily-ink-three.vercel.app](https://daily-ink-thr
 Without Supabase credentials the app runs in **local mode** — everything stays in the browser. To enable cloud sync:
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `profiles`, `entries`, `tasks`, `reviews`, `routines` and `login_events` tables with RLS policies and signup triggers, and registers the tables with the Realtime publication (needed for live cross-device sync). The file is safe to re-run - everything is idempotent.
+2. Open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `profiles`, `credentials`, `entries`, `tasks`, `reviews`, `routines` and `login_events` tables with RLS policies and signup triggers, plus the security-definer functions the sign-in flow calls while the visitor is still anonymous (`get_credential_for_signin`, `username_available`, `resolve_login_email`), and registers the tables with the Realtime publication (needed for live cross-device sync). The file is safe to re-run - everything is idempotent.
 3. Copy `.env.example` to `.env.local` and fill in your project URL and anon key (Dashboard → Project Settings → API):
 
 ```
@@ -56,9 +56,7 @@ SUPABASE_ANON_KEY=your-anon-key
 
 The anon key is safe for the browser; never use the `service_role` key here. `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are also accepted.
 
-4. **Turn off email confirmation (required).** Sign-in is username-based, and every account gets a synthetic `<username><timestamp>@<authEmailDomain>` address that can never receive mail. In the dashboard go to **Authentication → Providers → Email** and uncheck **Confirm email**. While it is on, signup tries to send a confirmation email to an address that cannot receive one, so signups fail with `email rate limit exceeded` (Supabase throttles confirmation mail) and any account that does get created can never sign in. This is a hard requirement, not a nicety.
-
-The generated domain defaults to `dailyink.app` and can be overridden with `VITE_AUTH_EMAIL_DOMAIN`. Supabase rejects reserved names outright - `.local`, `.test`, `.invalid` and friends all fail with `Email address "..." is invalid`, which is why the default is a normal-looking domain.
+4. **Enable the Email provider and turn off email confirmation (required).** Sign-in is username-based, but Supabase Auth still runs it, so every account gets a synthetic `<username><timestamp>@dailyink.app` address that can never receive mail. In the dashboard go to **Authentication → Providers → Email**: switch the provider **ON** and uncheck **Confirm email**. With the provider off, signups fail with `Email signups are not allowed for this provider`; while confirmation is on, signup tries to send a confirmation email to an address that cannot receive one, so signups fail with `email rate limit exceeded` (Supabase throttles confirmation mail) and any account that does get created can never sign in. Both are hard requirements, not niceties. Supabase rejects reserved domains outright (`.local`, `.test`, `.invalid`), which is why the synthetic address uses a normal-looking one.
 
 5. **Make yourself an admin (optional).** Sign up in the app once, then run this in the SQL editor:
 
@@ -68,7 +66,7 @@ update public.profiles set is_admin = true where username = 'yourname';
 
 Admins get an **Admin** tab with a login-activity page (`/admin`): every sign-in, sign-up and sign-out attempt with its username, time, device and result.
 
-> **Passwords are never recorded.** Supabase hashes passwords server-side, so no plaintext password exists anywhere in this project - the log intentionally stores usernames and timestamps only. The `is_admin` flag can only be set from the SQL editor: a database trigger stops the app from promoting itself, and row level security keeps the log readable by admins alone.
+> **Passwords are never recorded.** Passwords are hashed with PBKDF2-SHA256 (200,000 iterations) in the browser before they reach the `credentials` table, and Supabase hashes them again server-side - no plaintext password ever exists in this project. The login log intentionally stores usernames and timestamps only. The `is_admin` flag can only be set from the SQL editor: a database trigger stops the app from promoting itself, and row level security keeps the log readable by admins alone.
 
 ### 2. PWA icons (already generated)
 
