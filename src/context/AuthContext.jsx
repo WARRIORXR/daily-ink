@@ -19,6 +19,12 @@ function friendlyAuthError(message) {
   if (/password should be at least/i.test(raw)) {
     return 'Passwords need at least 6 characters.'
   }
+  if (/not allowed for this provider|email provider is disabled|signup.*disabled/i.test(raw)) {
+    return 'Email sign-in is turned off in your Supabase project. Enable it: Dashboard → Authentication → Sign In → Email, then retry.'
+  }
+  if (/email not confirmed/i.test(raw)) {
+    return 'Daily Ink accounts use synthetic addresses, so email confirmation must be off: Dashboard → Authentication → Providers → Email → uncheck "Confirm email", then sign up again.'
+  }
   if (/rate limit/i.test(raw)) {
     return 'Too many attempts. Please wait a moment and try again.'
   }
@@ -149,17 +155,16 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // Check if username is available in credentials table
+  // Check if a username is free. Anon cannot read the credentials table
+  // directly (owner-only RLS), so this goes through the security-definer RPC.
   async function isUsernameAvailable(username) {
-    const { data, error } = await supabase
-      .from('credentials')
-      .select('username')
-      .eq('username', username)
-      .maybeSingle()
-    if (error && error.code !== 'PGRST116') {
+    const { data, error } = await supabase.rpc('username_available', {
+      p_username: username,
+    })
+    if (error) {
       return { available: true, error: error.message }
     }
-    return { available: !data, error: null }
+    return { available: data === true, error: null }
   }
 
   // Sign up: create auth user + store credentials
@@ -254,12 +259,13 @@ export function AuthProvider({ children }) {
       }
       const clean = username.trim()
       try {
-        // Look up credentials
-        const { data: cred, error: credError } = await supabase
-          .from('credentials')
-          .select('user_id, password_hash')
-          .eq('username', clean)
-          .maybeSingle()
+        // Look up credentials via the security-definer RPC — the visitor is
+        // still anonymous here, so owner-only RLS would hide the row.
+        const { data: credRows, error: credError } = await supabase.rpc(
+          'get_credential_for_signin',
+          { p_username: clean },
+        )
+        const cred = credRows?.[0] ?? null
         if (credError) {
           setError(friendlyAuthError(credError.message))
           await logLoginEvent({
@@ -296,41 +302,30 @@ export function AuthProvider({ children }) {
           return { error: msg }
         }
 
-        // Sign in with Supabase Auth using the generated email
-        // We need to reconstruct the email — it was generated as: clean + timestamp + @dailyink.app
-        // Since we can't recover the timestamp, we'll query the auth user by user_id
-        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(cred.user_id)
-        if (userError || !userData?.user?.email) {
-          // Fallback: try to sign in with a generated email (may fail if timestamp differs)
-          const email = generateAuthEmail(clean)
-          const { data, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          })
-          if (signInError) {
-            setError(friendlyAuthError(signInError.message))
-            await logLoginEvent({
-              username: clean,
-              event: 'sign_in',
-              success: false,
-              reason: signInError.message,
-            })
-            return { error: friendlyAuthError(signInError.message) }
-          }
-          setSession(data.session)
-          exitGuestMode()
+        // Resolve the synthetic sign-in email saved on the profile at signup.
+        // The timestamp inside the address cannot be reconstructed client-side,
+        // and auth.admin.getUserById needs the service-role key, so we ask the
+        // database through the security-definer RPC (safe while signed out).
+        const { data: authEmail, error: emailError } = await supabase.rpc(
+          'resolve_login_email',
+          { p_username: clean },
+        )
+        if (emailError || !authEmail) {
+          const msg = emailError
+            ? friendlyAuthError(emailError.message)
+            : 'No account found with that username.'
+          setError(msg)
           await logLoginEvent({
             username: clean,
-            userId: data.session?.user?.id ?? null,
             event: 'sign_in',
-            success: true,
+            success: false,
+            reason: emailError?.message ?? 'profile has no sign-in email',
           })
-          return { error: null }
+          return { error: msg }
         }
 
-        // Sign in with the actual email from auth
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email: userData.user.email,
+          email: authEmail,
           password,
         })
         if (signInError) {

@@ -72,6 +72,24 @@ drop policy if exists "credentials_update_own" on public.credentials;
 create policy "credentials_update_own" on public.credentials
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- Sign-in happens while the visitor is still anonymous, so the owner-only
+-- policies above would hide every row. This security-definer function is the
+-- sanctioned anon read path for credential verification.
+create or replace function public.get_credential_for_signin(p_username text)
+returns table (user_id uuid, password_hash text)
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select c.user_id, c.password_hash
+  from public.credentials c
+  where c.username = btrim(p_username)
+  limit 1;
+$$;
+
+grant execute on function public.get_credential_for_signin(text) to anon, authenticated;
+
 -- One journal entry per day. Content may be client-side encrypted.
 create table if not exists public.entries (
   id          uuid primary key default gen_random_uuid(),
