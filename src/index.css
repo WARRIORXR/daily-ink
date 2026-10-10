@@ -20,6 +20,7 @@
   --color-clay-soft: var(--clay-soft);
   --color-success: var(--success);
   --color-danger: var(--danger);
+  --color-warn: var(--warn);
 
   --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.05), 0 10px 28px -14px rgba(28, 25, 23, 0.14);
   --shadow-pop: 0 6px 16px -6px rgba(28, 25, 23, 0.18), 0 24px 48px -20px rgba(28, 25, 23, 0.28);
@@ -85,6 +86,7 @@
   --clay-soft: rgba(180, 83, 58, 0.12);
   --success: #15803d;
   --danger: #b91c1c;
+  --warn: #92400e;
 }
 
 .dark {
@@ -102,6 +104,7 @@
   --clay-soft: rgba(224, 122, 95, 0.16);
   --success: #4ade80;
   --danger: #f87171;
+  --warn: #fbbf24;
 }
 
 html {

@@ -28,6 +28,9 @@ function friendlyAuthError(message) {
   if (/email_address_invalid|is invalid/i.test(raw)) {
     return 'Supabase rejected the generated sign-in address. Set VITE_AUTH_EMAIL_DOMAIN to a domain Supabase accepts (it refuses reserved names such as .local).'
   }
+  if (/email_provider_disabled|email (signups?|logins?) (are |is )?disabled/i.test(raw)) {
+    return 'Supabase is refusing every sign-in: your project has the Email provider switched off, and username accounts sign in through generated email addresses. Fix it in the Supabase dashboard (no code change needed): Authentication -> Sign In / Providers -> Email -> switch on "Enable Email provider" and uncheck "Confirm email". Then try again.'
+  }
   if (/rate limit/i.test(raw)) {
     return 'Supabase is rate-limiting confirmation emails, which means "Confirm email" is still on. Turn it off (Authentication -> Providers -> Email) and try again in a few minutes.'
   }
