@@ -46,6 +46,32 @@ alter table public.profiles add column if not exists username text unique;
 alter table public.profiles add column if not exists email    text unique;
 alter table public.profiles add column if not exists is_admin boolean not null default false;
 
+-- Credentials table for pure username/password auth (no email).
+-- Stores password hashes only; never stores plaintext passwords.
+create table if not exists public.credentials (
+  user_id       uuid primary key references auth.users (id) on delete cascade,
+  username      text unique not null,
+  password_hash text not null,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+alter table public.credentials enable row level security;
+
+-- Only the credential owner can read their own row (for verification).
+-- Service role bypasses RLS for admin operations.
+drop policy if exists "credentials_select_own" on public.credentials;
+create policy "credentials_select_own" on public.credentials
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "credentials_insert_own" on public.credentials;
+create policy "credentials_insert_own" on public.credentials
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "credentials_update_own" on public.credentials;
+create policy "credentials_update_own" on public.credentials
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- One journal entry per day. Content may be client-side encrypted.
 create table if not exists public.entries (
   id          uuid primary key default gen_random_uuid(),
