@@ -19,6 +19,15 @@ const rawKey =
 export const supabaseUrl = rawUrl.trim()
 export const supabaseAnonKey = rawKey.trim()
 
+// Project ref from a "https://<ref>.supabase.co" URL — used to deep-link
+// into the dashboard pages the setup hints talk about.
+export const supabaseProjectRef =
+  supabaseUrl.match(/^https:\/\/([a-z0-9-]+)\.supabase\.(?:co|in)/)?.[1] ?? null
+
+export const authProvidersUrl = supabaseProjectRef
+  ? `https://supabase.com/dashboard/project/${supabaseProjectRef}/auth/providers`
+  : 'https://supabase.com/dashboard'
+
 // Consider configured only if non-empty and not the default placeholder
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
@@ -41,6 +50,33 @@ export const supabase = isSupabaseConfigured
       },
     })
   : null
+
+/**
+ * Check the auth settings the username-only flow silently depends on.
+ * Daily Ink signs users up/in through Supabase Auth with internal synthetic
+ * email addresses, so the project must have the Email provider ON and
+ * "Confirm email" OFF. Returns the first blocking issue found, or null.
+ * @returns {Promise<{ checked: boolean, issue: 'provider_off' | 'confirm_email_on' | null }>}
+ */
+export async function checkAuthSetup() {
+  if (!supabase) return { checked: false, issue: null }
+  try {
+    const response = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+      headers: { apikey: supabaseAnonKey },
+    })
+    if (!response.ok) return { checked: false, issue: null }
+    const settings = await response.json()
+    if (settings?.external?.email === false) {
+      return { checked: true, issue: 'provider_off' }
+    }
+    if (settings?.external?.email && settings?.mailer_autoconfirm === false) {
+      return { checked: true, issue: 'confirm_email_on' }
+    }
+    return { checked: true, issue: null }
+  } catch {
+    return { checked: false, issue: null }
+  }
+}
 
 /**
  * Diagnostic helper to test whether the current Supabase instance is actually reachable.

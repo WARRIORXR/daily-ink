@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { isSupabaseConfigured, supabase } from '../config/supabaseClient'
+import { authProvidersUrl, isSupabaseConfigured, supabase } from '../config/supabaseClient'
 import { hashPassword, verifyPassword } from '../utils/crypto'
 
 const AuthContext = createContext(null)
@@ -20,10 +20,10 @@ function friendlyAuthError(message) {
     return 'Passwords need at least 6 characters.'
   }
   if (/not allowed for this provider|email provider is disabled|signup.*disabled/i.test(raw)) {
-    return 'Email sign-in is turned off in your Supabase project. Enable it: Dashboard → Authentication → Sign In → Email, then retry.'
+    return `Email sign-in is turned off in your Supabase project (one-time setup). Open ${authProvidersUrl} — switch the Email provider ON, uncheck "Confirm email", then Save. You never need to enter an email here.`
   }
   if (/email not confirmed/i.test(raw)) {
-    return 'Daily Ink accounts use synthetic addresses, so email confirmation must be off: Dashboard → Authentication → Providers → Email → uncheck "Confirm email", then sign up again.'
+    return `Accounts use internal sign-in addresses that can't receive email, so confirmation must be off: open ${authProvidersUrl} → Email → uncheck "Confirm email", then sign in again.`
   }
   if (/rate limit/i.test(raw)) {
     return 'Too many attempts. Please wait a moment and try again.'
