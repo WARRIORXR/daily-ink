@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { authProvidersUrl, checkAuthSetup } from '../config/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 
 const inputClass =
@@ -61,6 +62,37 @@ function validateFields(username, password) {
   return errors
 }
 
+/** Render text, turning any http(s) URLs inside it into clickable links. */
+function LinkifiedText({ text }) {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g)
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium underline underline-offset-2"
+          >
+            {part}
+          </a>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  )
+}
+
+const SETUP_COPY = {
+  provider_off:
+    'Daily Ink signs you in with just a username — no email is ever asked for — but behind the scenes it needs Supabase\'s Email provider switched on once. In the dashboard: Authentication → Sign In / Providers → Email → turn it ON, uncheck "Confirm email", then Save.',
+  confirm_email_on:
+    'One more toggle: in the dashboard go to Authentication → Sign In / Providers → Email and uncheck "Confirm email", then Save. (Internal sign-in addresses can\'t receive email.)',
+}
+
 export default function AuthForm() {
   const { signIn, signUp } = useAuth()
 
@@ -74,6 +106,25 @@ export default function AuthForm() {
   const [busy, setBusy] = useState(false)
   // Only start showing live validation once the user has tried to submit.
   const [submitted, setSubmitted] = useState(false)
+  // Set when Supabase's auth config blocks username sign-in (Email provider
+  // off or "Confirm email" on). Re-checked when the user returns from the
+  // dashboard so the banner clears itself once the toggles are fixed.
+  const [setupIssue, setSetupIssue] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    async function run() {
+      const { checked, issue } = await checkAuthSetup()
+      if (active && checked) setSetupIssue(issue)
+    }
+    run()
+    const onFocus = () => run()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      active = false
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
 
   const isSignup = mode === 'signup'
 
@@ -172,6 +223,21 @@ export default function AuthForm() {
       </div>
 
       <div className="mt-5 space-y-3">
+        {setupIssue ? (
+          <div className="rounded-xl border border-accent/30 bg-accent/10 px-3.5 py-3 text-sm leading-relaxed text-ink">
+            <p className="font-medium">One-time Supabase setup needed</p>
+            <p className="mt-1 text-muted">{SETUP_COPY[setupIssue]}</p>
+            <a
+              href={authProvidersUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1 font-medium text-accent underline underline-offset-2 hover:opacity-80"
+            >
+              Open Supabase auth settings ↗
+            </a>
+          </div>
+        ) : null}
+
         {notice ? (
           <div
             role="status"
@@ -188,7 +254,9 @@ export default function AuthForm() {
             className="flex gap-2.5 rounded-xl border border-danger/30 bg-danger/10 px-3.5 py-3 text-sm leading-relaxed break-words text-danger"
           >
             <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>{serverError}</p>
+            <p>
+              <LinkifiedText text={serverError} />
+            </p>
           </div>
         ) : null}
       </div>
