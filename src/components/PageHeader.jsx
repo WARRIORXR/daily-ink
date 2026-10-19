@@ -8,9 +8,9 @@ export default function PageHeader({ eyebrow, title, description, actions, child
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           {eyebrow ? (
-            <p className="font-hand text-2xl leading-none text-accent">{eyebrow}</p>
+            <p className="text-xs uppercase tracking-wider text-muted">{eyebrow}</p>
           ) : null}
-          <h1 className="mt-1 font-display text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
+          <h1 className="mt-1 font-display text-2xl leading-tight tracking-tight text-ink sm:text-3xl">
             {title}
           </h1>
         </div>
@@ -21,7 +21,6 @@ export default function PageHeader({ eyebrow, title, description, actions, child
           {description}
         </p>
       ) : null}
-      <div aria-hidden="true" className="hairline mt-4 w-24" />
       {children ? <div className="mt-4">{children}</div> : null}
     </header>
   )

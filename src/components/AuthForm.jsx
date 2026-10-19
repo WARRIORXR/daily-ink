@@ -3,7 +3,7 @@ import { authProvidersUrl, checkAuthSetup } from '../config/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 
 const inputClass =
-  'w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-ink outline-none ring-accent/30 placeholder:text-faint transition focus:ring-4'
+  'w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none ring-accent/15 placeholder:text-faint transition focus:border-ink/40 focus:ring-2'
 
 const MODES = [
   { id: 'signin', label: 'Sign in' },
@@ -190,13 +190,8 @@ export default function AuthForm() {
       <div
         role="tablist"
         aria-label="Sign in or create an account"
-        className="relative grid grid-cols-2 rounded-full border border-border bg-surface-2/80 p-1"
+        className="flex gap-6 border-b border-border"
       >
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-accent shadow-card transition-transform duration-300 ease-out"
-          style={{ transform: mode === 'signin' ? 'translateX(0)' : 'translateX(100%)' }}
-        />
         {MODES.map((item) => (
           <button
             key={item.id}
@@ -204,8 +199,10 @@ export default function AuthForm() {
             role="tab"
             aria-selected={mode === item.id}
             onClick={() => switchMode(item.id)}
-            className={`relative z-10 rounded-full px-3 py-2 text-sm font-medium transition ${
-              mode === item.id ? 'text-on-accent' : 'text-muted hover:text-ink'
+            className={`-mb-px border-b pb-2.5 text-sm transition ${
+              mode === item.id
+                ? 'border-ink font-medium text-ink'
+                : 'border-transparent text-muted hover:text-ink'
             }`}
           >
             {item.label}
@@ -214,7 +211,7 @@ export default function AuthForm() {
       </div>
 
       <div className="mt-6 text-center sm:text-left">
-        <h1 className="font-display text-2xl tracking-tight text-ink sm:text-[1.7rem]">
+        <h1 className="font-display text-2xl tracking-tight text-ink">
           {isSignup ? 'Create your account' : 'Welcome back'}
         </h1>
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
@@ -334,7 +331,7 @@ export default function AuthForm() {
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-on-accent shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-on-accent transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? (
             <>

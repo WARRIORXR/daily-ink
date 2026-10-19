@@ -1,5 +1,5 @@
+import { addDays } from '../core'
 import {
-  addDays,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
@@ -39,8 +39,9 @@ export function parseEntryKey(key) {
   return parse(key, KEY_FORMAT, new Date())
 }
 
+/** Shift a date key by whole days (Rust core; calendar days, no DST drift). */
 export function addDaysToKey(key, amount) {
-  return format(addDays(parseEntryKey(key), amount), KEY_FORMAT)
+  return addDays(key, amount)
 }
 
 export function getMonthLabel(date) {

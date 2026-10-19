@@ -33,3 +33,9 @@ dist-ssr
 .eslintcache
 *.tsbuildinfo
 supabase/.temp
+
+# Rust build output, Python caches, local backups
+core/target
+__pycache__/
+*.pyc
+backups/

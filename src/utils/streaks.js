@@ -1,44 +1,12 @@
-import { format, parse, subDays } from 'date-fns'
-
-const KEY_FORMAT = 'yyyy-MM-dd'
+import { computeStreaks as computeStreaksCore } from '../core'
+import { getEntryKey } from './formatDate'
 
 /**
- * Compute streak statistics from a set of date keys ('yyyy-MM-dd').
- * A streak is alive while yesterday has an entry even if today is still blank.
+ * Streak statistics for a set of date keys ('yyyy-MM-dd'). Computed in Rust
+ * (core/src/logic.rs). A streak is alive while yesterday has an entry even if
+ * today is still blank.
+ * @returns {{ current: number, longest: number, total: number, missedToday: boolean }}
  */
-export function computeStreaks(dateKeys, todayKey = format(new Date(), KEY_FORMAT)) {
-  const days = new Set(dateKeys)
-  const has = (key) => days.has(key)
-
-  let current = 0
-  let cursor = parse(todayKey, KEY_FORMAT, new Date())
-  if (!has(format(cursor, KEY_FORMAT))) cursor = subDays(cursor, 1)
-  while (has(format(cursor, KEY_FORMAT))) {
-    current += 1
-    cursor = subDays(cursor, 1)
-  }
-
-  const sorted = [...days].sort()
-  let longest = 0
-  let run = 0
-  let prev = null
-  for (const key of sorted) {
-    if (prev) {
-      const diff =
-        (parse(key, KEY_FORMAT, new Date()) - parse(prev, KEY_FORMAT, new Date())) / 86_400_000
-      // Round: a daylight-saving change makes a calendar day 23 or 25 hours.
-      run = Math.round(diff) === 1 ? run + 1 : 1
-    } else {
-      run = 1
-    }
-    longest = Math.max(longest, run)
-    prev = key
-  }
-
-  return {
-    current,
-    longest,
-    total: days.size,
-    missedToday: !has(todayKey),
-  }
+export function computeStreaks(dateKeys, todayKey = getEntryKey()) {
+  return computeStreaksCore([...dateKeys], todayKey)
 }

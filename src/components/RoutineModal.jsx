@@ -163,7 +163,7 @@ export default function RoutineModal({ open, onClose, routines = [], onAddRoutin
           <button
             type="submit"
             disabled={isSubmitting || !title.trim()}
-            className="w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-on-accent transition hover:opacity-90 disabled:opacity-50 shadow-sm"
+            className="w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-on-accent transition hover:opacity-90 disabled:opacity-50"
           >
             {isSubmitting ? 'Adding…' : '+ Add Routine to Calendar'}
           </button>
@@ -190,7 +190,7 @@ export default function RoutineModal({ open, onClose, routines = [], onAddRoutin
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span
-                      className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-base shadow-sm"
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-base"
                       style={{ backgroundColor: `${r.color}20`, color: r.color }}
                     >
                       {r.icon || '✨'}

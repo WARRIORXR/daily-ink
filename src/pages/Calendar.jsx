@@ -40,7 +40,7 @@ export default function Calendar() {
           <button
             type="button"
             onClick={() => setIsRoutineModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-medium text-ink shadow-sm transition hover:border-accent/40 hover:bg-surface-2 sm:text-sm"
+            className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-medium text-ink transition hover:border-accent/40 hover:bg-surface-2 sm:text-sm"
           >
             <span aria-hidden="true">✨</span>
             <span>Routines &amp; Intervals</span>
@@ -108,7 +108,7 @@ export default function Calendar() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span
-                      className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-lg shadow-sm"
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-lg"
                       style={{ backgroundColor: `${routine.color}20`, color: routine.color }}
                     >
                       {routine.icon || '✨'}

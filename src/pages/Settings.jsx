@@ -201,7 +201,7 @@ export default function Settings() {
           ) : (
             <Link
               to="/login"
-              className="rounded-full bg-accent px-4 py-1.5 text-xs sm:text-sm font-medium text-on-accent transition hover:opacity-90 shadow-sm"
+              className="rounded-full bg-accent px-4 py-1.5 text-xs sm:text-sm font-medium text-on-accent transition hover:opacity-90"
             >
               Sign in / Connect
             </Link>
