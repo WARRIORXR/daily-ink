@@ -1,6 +1,6 @@
 //! Writing helpers: daily prompts, word counts and the mood map.
 
-use crate::date::{format_key, parse_key};
+use crate::date::{add_months, format_key, parse_key};
 use std::collections::BTreeMap;
 
 const PROMPTS: [&str; 30] = [
@@ -88,6 +88,44 @@ pub fn mood_map(
     (cells, top)
 }
 
+/// "On this day" picks: the entry exactly 1 month, 6 months and 1 year ago
+/// (when there is one), plus one random older entry that changes daily.
+/// Returns (label, date key) pairs; empty when nothing qualifies.
+pub fn memories(keys: &[String], today: &str, seed: u32) -> Vec<(&'static str, String)> {
+    let Some(today_n) = parse_key(today) else {
+        return Vec::new();
+    };
+    let written: std::collections::BTreeSet<&str> = keys.iter().map(String::as_str).collect();
+    let mut picks: Vec<(&'static str, String)> =
+        [(1, "1 month ago"), (6, "6 months ago"), (12, "1 year ago")]
+            .into_iter()
+            .filter_map(|(months, label)| {
+                let key = add_months(today, -months)?;
+                written.contains(key.as_str()).then_some((label, key))
+            })
+            .collect();
+
+    // "Older" means more than a month back and not already shown above.
+    let older: Vec<&str> = written
+        .iter()
+        .copied()
+        .filter(|k| parse_key(k).is_some_and(|d| d < today_n - 31))
+        .filter(|k| picks.iter().all(|(_, p)| p != k))
+        .collect();
+    if !older.is_empty() {
+        // Mix the seed with the day so the pick is stable for a day, then changes.
+        let mut x = seed ^ (today_n as u32).wrapping_mul(2_654_435_761);
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        picks.push((
+            "From the archive",
+            older[x as usize % older.len()].to_string(),
+        ));
+    }
+    picks
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -102,6 +140,33 @@ mod tests {
             daily_prompt("2026-10-19", 0)
         );
         assert!(!daily_prompt("bad", -5).is_empty());
+    }
+
+    #[test]
+    fn memories_pick_exact_anniversaries_and_one_older_entry() {
+        let keys: Vec<String> = [
+            "2026-09-19",
+            "2026-04-19",
+            "2025-10-19",
+            "2025-01-02",
+            "2026-10-10",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        let m = memories(&keys, "2026-10-19", 7);
+        assert_eq!(
+            &m[..3],
+            &[
+                ("1 month ago", "2026-09-19".to_string()),
+                ("6 months ago", "2026-04-19".to_string()),
+                ("1 year ago", "2025-10-19".to_string()),
+            ]
+        );
+        // Only 2025-01-02 is older than a month and not already shown.
+        assert_eq!(m[3], ("From the archive", "2025-01-02".to_string()));
+        assert_eq!(memories(&keys, "2026-10-19", 7), m); // stable for the day
+        assert!(memories(&["2026-10-18".to_string()], "2026-10-19", 1).is_empty());
     }
 
     #[test]

@@ -194,3 +194,10 @@ pub fn mood_map(moods: JsValue, today: &str, days: u32) -> Result<JsValue, JsVal
         .collect();
     to_js(&MoodMapOut { days, top })
 }
+
+/// Returns `[label, dateKey]` pairs for the "On this day" section.
+#[wasm_bindgen]
+pub fn memories(keys: JsValue, today: &str, seed: u32) -> Result<JsValue, JsValue> {
+    let keys: Vec<String> = from_js(keys)?;
+    to_js(&insights::memories(&keys, today, seed))
+}

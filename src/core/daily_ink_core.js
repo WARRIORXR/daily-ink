@@ -255,6 +255,23 @@ export function moodMap(moods, today, days) {
 }
 
 /**
+ * Returns `[label, dateKey]` pairs for the "On this day" section.
+ * @param {any} keys
+ * @param {string} today
+ * @param {number} seed
+ * @returns {any}
+ */
+export function memories(keys, today, seed) {
+    const ptr0 = passStringToWasm0(today, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.memories(keys, ptr0, len0, seed);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
  * `reviews` is a list of `[dateKey, dueDate]` pairs. Returns
  * `[dateKey, scheduled]` pairs, oldest first.
  * @param {any} entry_keys

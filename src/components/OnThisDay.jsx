@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { memories } from '../core'
 import { useEntryContent } from '../hooks/useEntryContent'
 import { formatEntryDate, getEntryKey } from '../utils/formatDate'
 import { moodByKey } from '../utils/moods'
 import { buildDateQuiz } from '../utils/quiz'
 import MemoryQuiz from './MemoryQuiz'
 
-function OnThisDayItem({ dateKey, entry, otherKeys, yearsAgo }) {
+function OnThisDayItem({ dateKey, entry, otherKeys, label }) {
   const [phase, setPhase] = useState('locked') // locked | quiz | revealed
   const text = useEntryContent(entry)
   const quiz = useMemo(
@@ -26,7 +27,7 @@ function OnThisDayItem({ dateKey, entry, otherKeys, yearsAgo }) {
       <div className="relative flex items-start justify-between gap-3">
         <div>
           <p className="font-hand text-xl leading-none text-accent">
-            {yearsAgo === 0 ? 'On this day' : `${yearsAgo} year${yearsAgo === 1 ? '' : 's'} ago`}
+            {label}
           </p>
           <h3 className="mt-1 font-display text-lg text-ink">{formatEntryDate(dateKey)}</h3>
         </div>
@@ -104,19 +105,17 @@ function OnThisDayItem({ dateKey, entry, otherKeys, yearsAgo }) {
 
 export default function OnThisDay({ entries }) {
   const todayKey = getEntryKey(new Date())
-  const todayMonthDay = todayKey.slice(5) // 'MM-dd'
 
+  // 1 month, 6 months and 1 year ago, plus one older entry that changes
+  // daily, picked in Rust (core/src/insights.rs). Blank pages are skipped.
   const items = useMemo(() => {
-    return Object.entries(entries)
-      .filter(
-        ([dateKey, entry]) =>
-          dateKey !== todayKey &&
-          dateKey.slice(5) === todayMonthDay &&
-          (entry?.content || '').trim().length > 0,
-      )
-      .sort(([a], [b]) => b.localeCompare(a))
-      .slice(0, 3)
-  }, [entries, todayKey, todayMonthDay])
+    const written = Object.keys(entries).filter((key) => (entries[key]?.content || '').trim())
+    return memories(written, todayKey, 1).map(([label, dateKey]) => ({
+      label,
+      dateKey,
+      entry: entries[dateKey],
+    }))
+  }, [entries, todayKey])
 
   if (items.length === 0) return null
 
@@ -126,16 +125,16 @@ export default function OnThisDay({ entries }) {
     <section aria-label="On this day" className="space-y-4">
       <div className="flex items-baseline justify-between">
         <h2 className="font-display text-xl text-ink">On this day</h2>
-        <p className="font-hand text-lg text-faint">same date, past years</p>
+        <p className="font-hand text-lg text-faint">a month, six months, a year back</p>
       </div>
       <div className="space-y-3">
-        {items.map(([dateKey, entry]) => (
+        {items.map((item) => (
           <OnThisDayItem
-            key={dateKey}
-            dateKey={dateKey}
-            entry={entry}
+            key={item.dateKey}
+            dateKey={item.dateKey}
+            entry={item.entry}
             otherKeys={otherKeys}
-            yearsAgo={new Date().getFullYear() - parseInt(dateKey.slice(0, 4), 10)}
+            label={item.label}
           />
         ))}
       </div>
