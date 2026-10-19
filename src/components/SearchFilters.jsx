@@ -3,9 +3,13 @@ import { MOODS } from '../utils/moods'
 const inputClass =
   'rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink outline-none ring-accent/30 placeholder:text-faint focus:ring-4'
 
-export default function SearchFilters({ filters, onChange }) {
+const NO_FILTERS = { q: '', from: null, to: null, mood: null, hasTasks: false, tag: null }
+
+export default function SearchFilters({ filters, tags = [], onChange }) {
   const set = (patch) => onChange({ ...filters, ...patch })
-  const active = Boolean(filters.q || filters.from || filters.to || filters.mood || filters.hasTasks)
+  const active = Boolean(
+    filters.q || filters.from || filters.to || filters.mood || filters.hasTasks || filters.tag,
+  )
 
   return (
     <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
@@ -32,7 +36,7 @@ export default function SearchFilters({ filters, onChange }) {
           type="search"
           value={filters.q}
           onChange={(event) => set({ q: event.target.value })}
-          placeholder="Search your pages…"
+          placeholder="Search words, tasks or dates…"
           className={`${inputClass} w-full pl-10`}
         />
       </div>
@@ -90,13 +94,36 @@ export default function SearchFilters({ filters, onChange }) {
         {active && (
           <button
             type="button"
-            onClick={() => onChange({ q: '', from: null, to: null, mood: null, hasTasks: false })}
+            onClick={() => onChange(NO_FILTERS)}
             className="text-muted underline-offset-2 hover:text-ink hover:underline"
           >
             Clear filters
           </button>
         )}
       </div>
+
+      {tags.length > 0 && (
+        <div role="group" aria-label="Filter by tag" className="flex flex-wrap gap-2 text-sm">
+          {tags.map(([tag, count]) => {
+            const selected = filters.tag === tag
+            return (
+              <button
+                key={tag}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => set({ tag: selected ? null : tag })}
+                className={`rounded-full border px-3 py-1 transition ${
+                  selected
+                    ? 'border-accent bg-accent text-on-accent'
+                    : 'border-border bg-surface-2 text-muted hover:border-accent/40 hover:text-ink'
+                }`}
+              >
+                #{tag} <span className="opacity-70">{count}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

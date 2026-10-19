@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useEncryption } from '../hooks/useEncryption'
 import { useEntries } from '../hooks/useEntries'
 import { useEntryContent } from '../hooks/useEntryContent'
 import { useToast } from '../context/ToastContext'
 import { formatEntryDate, getEntryKey } from '../utils/formatDate'
+import { extractTags } from '../utils/tags'
 import { WORD_GOALS, getPrompt, getWordStats, loadWordGoal, saveWordGoal } from '../utils/writing'
 import MoodPicker from './MoodPicker'
 import TaskList from './TaskList'
@@ -173,6 +174,7 @@ export default function EntryEditor({ dateKey }) {
   }, [isToday, plain])
   const prompt = getPrompt(dateKey, promptOffset)
   const { words, minutes } = useMemo(() => getWordStats(content), [content])
+  const tags = useMemo(() => extractTags(content), [content])
   const goalProgress = wordGoal ? Math.min(words / wordGoal, 1) : 0
 
   function insertPrompt() {
@@ -318,6 +320,27 @@ export default function EntryEditor({ dateKey }) {
           </div>
         ) : null}
       </div>
+
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted sm:text-sm">
+        {tags.length ? (
+          <>
+            <span>Tags</span>
+            {tags.map((tag) => (
+              <Link
+                key={tag}
+                to={`/entries?tag=${encodeURIComponent(tag)}`}
+                className="rounded-full border border-border bg-surface-2 px-2.5 py-0.5 transition hover:border-accent/40 hover:text-ink"
+              >
+                #{tag}
+              </Link>
+            ))}
+          </>
+        ) : (
+          <span className="text-faint">
+            Add a #tag anywhere in your page to group it with others.
+          </span>
+        )}
+      </p>
 
       <TaskList tasks={dayTasks} onSave={(list) => saveTasks(dateKey, list)} />
 
