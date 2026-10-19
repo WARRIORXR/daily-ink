@@ -188,6 +188,25 @@ export function computeStreaks(keys, today) {
 }
 
 /**
+ * `levels` is a list of `[dateKey, level 1-4]` pairs. Returns `[dateKey, level]`
+ * pairs in Monday-first columns; 0 = blank, 5 = frozen, -1 = after today.
+ * @param {any} levels
+ * @param {any} frozen
+ * @param {string} today
+ * @param {number} weeks
+ * @returns {any}
+ */
+export function heatmap(levels, frozen, today, weeks) {
+    const ptr0 = passStringToWasm0(today, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.heatmap(levels, frozen, ptr0, len0, weeks);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
  * @param {number} repetitions
  * @param {number} ease_factor
  * @param {number} grade
@@ -198,6 +217,37 @@ export function nextReview(repetitions, ease_factor, grade, today) {
     const ptr0 = passStringToWasm0(today, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.nextReview(repetitions, ease_factor, grade, ptr0, len0);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * @param {string} text
+ * @returns {any}
+ */
+export function wordStats(text) {
+    const ptr0 = passStringToWasm0(text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.wordStats(ptr0, len0);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * `moods` is a list of `[dateKey, mood]` pairs.
+ * @param {any} moods
+ * @param {string} today
+ * @param {number} days
+ * @returns {any}
+ */
+export function moodMap(moods, today, days) {
+    const ptr0 = passStringToWasm0(today, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.moodMap(moods, ptr0, len0, days);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -216,23 +266,6 @@ export function dueQueue(entry_keys, reviews, today) {
     const ptr0 = passStringToWasm0(today, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.dueQueue(entry_keys, reviews, ptr0, len0);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return takeFromExternrefTable0(ret[0]);
-}
-
-/**
- * `moods` is a list of `[dateKey, mood]` pairs.
- * @param {any} moods
- * @param {string} today
- * @param {number} days
- * @returns {any}
- */
-export function moodMap(moods, today, days) {
-    const ptr0 = passStringToWasm0(today, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.moodMap(moods, ptr0, len0, days);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -374,20 +407,6 @@ export function dailyPrompt(date, offset) {
     }
 }
 
-/**
- * @param {string} text
- * @returns {any}
- */
-export function wordStats(text) {
-    const ptr0 = passStringToWasm0(text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.wordStats(ptr0, len0);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return takeFromExternrefTable0(ret[0]);
-}
-
 async function __wbg_load(module, imports) {
     if (typeof Response === 'function' && module instanceof Response) {
         if (typeof WebAssembly.instantiateStreaming === 'function') {
@@ -466,6 +485,10 @@ function __wbg_get_imports() {
         const ret = Array.isArray(arg0);
         return ret;
     };
+    imports.wbg.__wbg_isSafeInteger_343e2beeeece1bb0 = function(arg0) {
+        const ret = Number.isSafeInteger(arg0);
+        return ret;
+    };
     imports.wbg.__wbg_iterator_9a24c88df860dc65 = function() {
         const ret = Symbol.iterator;
         return ret;
@@ -509,6 +532,10 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_value_cd1ffa7b1ab794f1 = function(arg0) {
         const ret = arg0.value;
+        return ret;
+    };
+    imports.wbg.__wbindgen_as_number = function(arg0) {
+        const ret = +arg0;
         return ret;
     };
     imports.wbg.__wbindgen_bigint_from_i64 = function(arg0) {

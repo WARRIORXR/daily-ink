@@ -10,6 +10,7 @@ export {
   computeStreaks,
   dailyPrompt,
   dueQueue,
+  heatmap,
   intervalSummary,
   moodMap,
   nextReview,

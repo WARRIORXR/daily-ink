@@ -47,13 +47,20 @@ pub fn daily_prompt(date: &str, offset: i64) -> &'static str {
 
 /// Words in the text and minutes to read it at about 200 words a minute.
 pub fn word_stats(text: &str) -> (u32, u32) {
-    let words = text.split_whitespace().filter(|w| w.chars().any(char::is_alphanumeric)).count() as u32;
+    let words = text
+        .split_whitespace()
+        .filter(|w| w.chars().any(char::is_alphanumeric))
+        .count() as u32;
     (words, words.div_ceil(200))
 }
 
 /// The last `days` days ending on `today`, oldest first, each with its mood
 /// (if any), plus the most common mood among them (ties go to the most recent).
-pub fn mood_map(moods: &[(String, String)], today: &str, days: u32) -> (Vec<(String, Option<String>)>, Option<String>) {
+pub fn mood_map(
+    moods: &[(String, String)],
+    today: &str,
+    days: u32,
+) -> (Vec<(String, Option<String>)>, Option<String>) {
     let Some(end) = parse_key(today) else {
         return (Vec::new(), None);
     };
@@ -90,7 +97,10 @@ mod tests {
         assert_eq!(daily_prompt("2026-10-19", 0), daily_prompt("2026-10-19", 0));
         assert_ne!(daily_prompt("2026-10-19", 0), daily_prompt("2026-10-19", 1));
         assert_ne!(daily_prompt("2026-10-19", 0), daily_prompt("2026-10-20", 0));
-        assert_eq!(daily_prompt("2026-10-19", 30), daily_prompt("2026-10-19", 0));
+        assert_eq!(
+            daily_prompt("2026-10-19", 30),
+            daily_prompt("2026-10-19", 0)
+        );
         assert!(!daily_prompt("bad", -5).is_empty());
     }
 
@@ -112,7 +122,10 @@ mod tests {
         ];
         let (cells, top) = mood_map(&moods, "2026-10-19", 4);
         assert_eq!(cells.first().unwrap(), &("2026-10-16".to_string(), None));
-        assert_eq!(cells.last().unwrap(), &("2026-10-19".to_string(), Some("low".to_string())));
+        assert_eq!(
+            cells.last().unwrap(),
+            &("2026-10-19".to_string(), Some("low".to_string()))
+        );
         assert_eq!(cells.len(), 4);
         assert_eq!(top.as_deref(), Some("low"));
         assert_eq!(mood_map(&[], "2026-10-19", 3).1, None);
