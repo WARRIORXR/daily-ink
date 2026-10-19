@@ -11,10 +11,10 @@ from pathlib import Path
 
 OUT_DIR = Path(__file__).resolve().parent.parent / "public" / "icons"
 
-BG = (24, 24, 27, 255)  # zinc-900, matches the app's ink colour
-PAPER = (250, 250, 250, 255)
-LINE = (212, 212, 216, 255)
-MARK = (24, 24, 27, 255)
+BG = (28, 25, 23, 255)  # stone-900, matches the app's ink colour
+PAPER = (250, 246, 239, 255)  # paper
+LINE = (214, 205, 192, 255)  # stone-300
+MARK = (180, 83, 9, 255)  # amber accent
 
 
 def encode_png(width: int, height: int, rgba: bytearray) -> bytes:

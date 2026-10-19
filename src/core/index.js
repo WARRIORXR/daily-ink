@@ -8,11 +8,14 @@ export const ready = init()
 export {
   addDays,
   computeStreaks,
+  dailyPrompt,
   dueQueue,
   intervalSummary,
+  moodMap,
   nextReview,
   nextRoutineDate,
   quizOptions,
   routineOn,
   snippet,
+  wordStats,
 } from './daily_ink_core.js'

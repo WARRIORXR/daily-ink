@@ -52,7 +52,8 @@ export default function CalendarView({
       {/* Month nav */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-display text-2xl text-ink">
+          <p className="font-hand text-lg leading-none text-accent">your memory map</p>
+          <h2 className="mt-0.5 font-display text-2xl text-ink">
             {getMonthLabel(cursor)}
           </h2>
         </div>
@@ -132,7 +133,7 @@ export default function CalendarView({
                 inMonth ? 'text-ink' : 'text-faint/40'
               } ${
                 selected
-                  ? 'bg-accent text-on-accent'
+                  ? 'bg-accent text-on-accent shadow-sm'
                   : 'hover:bg-surface-2'
               } ${
                 todayFlag && !selected

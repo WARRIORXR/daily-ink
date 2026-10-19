@@ -2,7 +2,7 @@
 name = "daily-ink-core"
 version = "0.1.0"
 edition = "2021"
-description = "Daily Ink app logic: dates, streaks, spaced repetition, routines and quiz, compiled to WebAssembly."
+description = "Daily Ink app logic: dates, streaks, spaced repetition, routines, quiz, prompts and mood map, compiled to WebAssembly."
 publish = false
 
 [lib]

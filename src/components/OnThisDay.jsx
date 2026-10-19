@@ -25,7 +25,7 @@ function OnThisDayItem({ dateKey, entry, otherKeys, yearsAgo }) {
 
       <div className="relative flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-wider text-muted">
+          <p className="font-hand text-xl leading-none text-accent">
             {yearsAgo === 0 ? 'On this day' : `${yearsAgo} year${yearsAgo === 1 ? '' : 's'} ago`}
           </p>
           <h3 className="mt-1 font-display text-lg text-ink">{formatEntryDate(dateKey)}</h3>
@@ -35,7 +35,7 @@ function OnThisDayItem({ dateKey, entry, otherKeys, yearsAgo }) {
           <span aria-hidden="true" className="block text-lg">
             {mood ? mood.emoji : '✉️'}
           </span>
-          <span className="block text-xs uppercase tracking-wider text-muted">memories</span>
+          <span className="block font-hand text-sm leading-none text-clay">memories</span>
         </div>
       </div>
 
@@ -48,7 +48,7 @@ function OnThisDayItem({ dateKey, entry, otherKeys, yearsAgo }) {
           <button
             type="button"
             onClick={() => setPhase('quiz')}
-            className="mt-3 rounded-full bg-accent px-4 py-2 text-sm text-on-accent transition active:translate-y-0"
+            className="mt-3 rounded-full bg-accent px-4 py-2 text-sm text-on-accent shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
           >
             Memory check
           </button>
@@ -69,7 +69,7 @@ function OnThisDayItem({ dateKey, entry, otherKeys, yearsAgo }) {
 
       {phase === 'revealed' && (
         <div className="animate-fade-in mt-5">
-          <p className="whitespace-pre-wrap leading-relaxed text-ink">
+          <p className="drop-cap whitespace-pre-wrap leading-relaxed text-ink">
             {text || 'This page was left empty.'}
           </p>
           <div className="mt-4 flex items-center justify-between">
@@ -92,7 +92,7 @@ function OnThisDayItem({ dateKey, entry, otherKeys, yearsAgo }) {
                 <path d="M5 12h14m-6-6 6 6-6 6" />
               </svg>
             </Link>
-            <span aria-hidden="true" className="text-xs uppercase tracking-wider text-muted">
+            <span aria-hidden="true" className="font-hand text-lg text-faint">
               — Daily Ink
             </span>
           </div>
@@ -126,7 +126,7 @@ export default function OnThisDay({ entries }) {
     <section aria-label="On this day" className="space-y-4">
       <div className="flex items-baseline justify-between">
         <h2 className="font-display text-xl text-ink">On this day</h2>
-        <p className="text-xs uppercase tracking-wider text-muted">same date, past years</p>
+        <p className="font-hand text-lg text-faint">same date, past years</p>
       </div>
       <div className="space-y-3">
         {items.map(([dateKey, entry]) => (

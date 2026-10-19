@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import MoodMap from '../components/MoodMap'
 import OnThisDay from '../components/OnThisDay'
 import StatsCards from '../components/StatsCards'
 import StreakBadge from '../components/StreakBadge'
@@ -62,10 +63,17 @@ export default function Home() {
     <div className="animate-fade-up space-y-6 sm:space-y-8">
       {/* Header */}
       <header className="space-y-2">
-        <p className="text-xs uppercase tracking-wider text-muted">{greeting()}</p>
-        <h1 className="font-display text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
+        <p className="font-hand text-2xl sm:text-3xl text-accent">{greeting()}</p>
+        <h1 className="font-display text-3xl sm:text-4xl md:text-5xl leading-tight text-ink tracking-tight">
           {today.label}
         </h1>
+        <div
+          aria-hidden="true"
+          className="mt-3 h-px w-20 sm:w-24 bg-gradient-to-r from-accent/60 to-transparent"
+        />
+        <p className="mt-3 max-w-lg text-base sm:text-lg leading-relaxed text-muted">
+          One page a day. Quiet, private, and yours.
+        </p>
       </header>
 
       {/* Streak */}
@@ -78,11 +86,14 @@ export default function Home() {
       {todayRoutines.length > 0 && (
         <section
           aria-label="Routines due today"
-          className="space-y-3"
+          className="rounded-2xl border border-accent/20 bg-surface p-4 sm:p-5 shadow-card space-y-3"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-xs uppercase tracking-wider text-muted">Routines today</h2>
+              <span className="h-2 w-2 rounded-full bg-accent" />
+              <h2 className="font-display text-base sm:text-lg text-ink">
+                Routines Due Today
+              </h2>
             </div>
             <Link
               to="/calendar"
@@ -138,7 +149,11 @@ export default function Home() {
         {/* Write */}
         <Link
           to="/journal"
-          className="group rounded-2xl border border-border bg-surface p-5 transition hover:border-ink/30"
+          className={`group relative overflow-hidden rounded-2xl border p-5 transition duration-200 hover:-translate-y-0.5 hover:shadow-card ${
+            hasEntry
+              ? 'border-accent/40 bg-accent-soft hover:border-accent hover:shadow-pop'
+              : 'border-accent bg-accent-soft hover:border-accent hover:shadow-pop'
+          }`}
         >
           <p className="font-display text-lg sm:text-xl text-ink">
             {hasEntry ? "Continue today's page" : "Write today's page"}
@@ -170,7 +185,7 @@ export default function Home() {
         {/* Review */}
         <Link
           to="/review"
-          className="group rounded-2xl border border-border bg-surface p-5 transition hover:border-ink/30"
+          className="group rounded-2xl border border-border bg-surface p-5 shadow-card transition duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-pop"
         >
           <p className="font-display text-lg sm:text-xl text-ink">Review memories</p>
           <p className="mt-1 text-sm text-muted">
@@ -197,6 +212,9 @@ export default function Home() {
           </span>
         </Link>
       </div>
+
+      {/* Mood map */}
+      <MoodMap entries={entries} todayKey={today.key} />
 
       {/* On this day */}
       <OnThisDay entries={entries} />

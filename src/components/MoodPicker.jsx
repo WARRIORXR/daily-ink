@@ -15,8 +15,8 @@ export default function MoodPicker({ value, onChange }) {
             onClick={() => onChange(selected ? null : mood.key)}
             className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition duration-150 ${
               selected
-                ? 'border-accent bg-accent-soft text-accent'
-                : 'border-border bg-surface text-muted hover:border-faint hover:text-ink'
+                ? 'border-accent bg-accent-soft text-accent shadow-sm'
+                : 'border-border bg-surface text-muted hover:-translate-y-0.5 hover:border-faint hover:text-ink'
             }`}
           >
             <span aria-hidden="true" className={selected ? 'scale-110 transition' : 'transition'}>

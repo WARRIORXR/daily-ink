@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useEncryption } from '../hooks/useEncryption'
 import { useEntries } from '../hooks/useEntries'
 import { useEntryContent } from '../hooks/useEntryContent'
 import { useToast } from '../context/ToastContext'
 import { formatEntryDate, getEntryKey } from '../utils/formatDate'
+import { WORD_GOALS, getPrompt, getWordStats, loadWordGoal, saveWordGoal } from '../utils/writing'
 import MoodPicker from './MoodPicker'
 import TaskList from './TaskList'
 
@@ -21,6 +22,8 @@ export default function EntryEditor({ dateKey }) {
   const [content, setContent] = useState('')
   const [mood, setMood] = useState(null)
   const [status, setStatus] = useState('idle') // idle | saving | saved
+  const [promptOffset, setPromptOffset] = useState(0)
+  const [wordGoal, setWordGoal] = useState(loadWordGoal)
   const lastPersisted = useRef({ text: '', mood: null })
   const timerRef = useRef(null)
 
@@ -73,6 +76,19 @@ export default function EntryEditor({ dateKey }) {
 
   // Local calendar day; toISOString() is UTC and is off by a day near midnight.
   const isToday = dateKey === getEntryKey()
+  const prompt = getPrompt(dateKey, promptOffset)
+  const { words, minutes } = useMemo(() => getWordStats(content), [content])
+  const goalProgress = wordGoal ? Math.min(words / wordGoal, 1) : 0
+
+  function insertPrompt() {
+    setContent((text) => (text.trim() ? `${text.trimEnd()}\n\n${prompt}\n` : `${prompt}\n`))
+  }
+
+  function changeGoal(event) {
+    const goal = Number(event.target.value)
+    setWordGoal(goal)
+    saveWordGoal(goal)
+  }
 
   return (
     <div className="space-y-4">
@@ -89,8 +105,16 @@ export default function EntryEditor({ dateKey }) {
                   : 'bg-border'
             }`}
           />
-          <span className="sm:hidden">{status === 'saving' ? 'Saving' : status === 'saved' ? 'Saved' : 'Auto-save on'}</span>
-          <span className="hidden sm:inline">{status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : 'Autosaves as you write'}</span>
+          <span className="sm:hidden">
+            {status === 'saving' ? 'Saving' : status === 'saved' ? 'Saved' : 'Auto-save on'}
+          </span>
+          <span className="hidden sm:inline">
+            {status === 'saving'
+              ? 'Saving…'
+              : status === 'saved'
+                ? 'Saved'
+                : 'Autosaves as you write'}
+          </span>
           {encryptionEnabled && unlocked ? (
             <span
               className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs"
@@ -102,10 +126,44 @@ export default function EntryEditor({ dateKey }) {
         </div>
       </div>
 
+      {/* Writing prompt */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-clay/25 bg-gradient-to-r from-clay-soft via-accent-soft to-transparent p-4 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <p className="font-hand text-lg leading-none text-clay">need a spark?</p>
+          <p className="mt-1 text-sm text-ink sm:text-base">{prompt}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={insertPrompt}
+            className="rounded-full bg-accent px-3.5 py-1.5 text-xs font-medium text-on-accent shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:text-sm"
+          >
+            Use prompt
+          </button>
+          <button
+            type="button"
+            onClick={() => setPromptOffset((n) => n + 1)}
+            className="rounded-full border border-border bg-surface px-3.5 py-1.5 text-xs text-muted transition hover:border-accent/40 hover:text-ink sm:text-sm"
+          >
+            Another
+          </button>
+        </div>
+      </div>
+
       <label htmlFor="entry-content" className="sr-only">
         Journal entry
       </label>
-      <div className="overflow-hidden rounded-2xl border border-border">
+      <div className="overflow-hidden rounded-2xl border border-border shadow-card">
+        {/* Decorative top bar */}
+        <div
+          aria-hidden="true"
+          className="flex h-8 items-center gap-1.5 border-b border-border bg-surface-2/50 px-4"
+        >
+          <span className="h-2.5 w-2.5 rounded-full bg-danger/50" />
+          <span className="h-2.5 w-2.5 rounded-full bg-accent/50" />
+          <span className="h-2.5 w-2.5 rounded-full bg-success/50" />
+          <span className="ml-2 font-hand text-sm text-faint">dear diary…</span>
+        </div>
         <textarea
           id="entry-content"
           value={content}
@@ -115,12 +173,54 @@ export default function EntryEditor({ dateKey }) {
               ? 'What stayed with you today?'
               : `What happened on ${formatEntryDate(dateKey)}?`
           }
-          className="editor-paper min-h-[28rem] w-full resize-y px-5 py-4 font-display text-lg leading-8 text-ink outline-none placeholder:text-faint focus:ring-2 ring-accent/20"
+          className="editor-paper min-h-[28rem] w-full resize-y px-5 py-4 text-lg sm:text-xl leading-10 sm:leading-12 text-ink outline-none ring-accent/30 placeholder:text-faint focus:ring-4"
           rows={10}
         />
       </div>
 
-      {/* Save status is now shown above the text area — clearer for mobile */}
+      {/* Word count and daily goal */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted sm:text-sm">
+        <span>
+          <span className="font-medium text-ink">{words}</span> {words === 1 ? 'word' : 'words'}
+          {words ? ` · ${minutes} min read` : ''}
+        </span>
+        <label className="flex items-center gap-1.5">
+          <span>Daily goal</span>
+          <select
+            value={wordGoal}
+            onChange={changeGoal}
+            className="rounded-full border border-border bg-surface px-2 py-0.5 text-ink outline-none focus:border-accent"
+          >
+            {WORD_GOALS.map((goal) => (
+              <option key={goal} value={goal}>
+                {goal ? `${goal} words` : 'Off'}
+              </option>
+            ))}
+          </select>
+        </label>
+        {wordGoal ? (
+          <div className="flex min-w-32 flex-1 items-center gap-2">
+            <div
+              role="progressbar"
+              aria-label="Daily word goal"
+              aria-valuemin={0}
+              aria-valuemax={wordGoal}
+              aria-valuenow={Math.min(words, wordGoal)}
+              className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2"
+            >
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  goalProgress >= 1 ? 'bg-success' : 'bg-gradient-to-r from-accent to-clay'
+                }`}
+                style={{ width: `${goalProgress * 100}%` }}
+              />
+            </div>
+            <span className={goalProgress >= 1 ? 'text-success' : ''}>
+              {goalProgress >= 1 ? 'Goal reached 🎉' : `${Math.round(goalProgress * 100)}%`}
+            </span>
+          </div>
+        ) : null}
+      </div>
 
       <TaskList tasks={dayTasks} onSave={(list) => saveTasks(dateKey, list)} />
 
@@ -132,6 +232,9 @@ export default function EntryEditor({ dateKey }) {
         >
           Delete entry
         </button>
+        <p aria-hidden="true" className="font-hand text-lg text-faint">
+          written with care
+        </p>
       </div>
     </div>
   )

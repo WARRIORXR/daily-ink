@@ -34,7 +34,7 @@ export default function MemoryQuiz({ prompt, options, correct, onCorrect, onReve
           const isCorrectOption = option.key === correct
           const isPicked = option.key === picked
           let style =
-            'border-border bg-surface text-ink hover:border-accent'
+            'border-border bg-surface text-ink hover:-translate-y-0.5 hover:border-accent hover:shadow-card'
           if (answered && isCorrectOption) style = 'border-success bg-success/10 text-success'
           else if (answered && isPicked) style = 'border-danger bg-danger/10 text-danger'
           return (
@@ -43,7 +43,7 @@ export default function MemoryQuiz({ prompt, options, correct, onCorrect, onReve
               type="button"
               disabled={answered}
               onClick={() => setPicked(option.key)}
-              className={`rounded-xl border px-3 py-2.5 text-sm transition duration-150 disabled:cursor-default disabled:hover:translate-y-0 disabled:hover:${style}`}
+              className={`rounded-xl border px-3 py-2.5 text-sm shadow-sm transition duration-150 disabled:cursor-default disabled:hover:translate-y-0 disabled:hover:shadow-sm ${style}`}
             >
               {option.label}
             </button>
@@ -69,7 +69,7 @@ export default function MemoryQuiz({ prompt, options, correct, onCorrect, onReve
           <button
             type="button"
             onClick={onCorrect}
-            className="mt-3 rounded-full bg-accent px-4 py-2 text-sm text-on-accent transition active:translate-y-0"
+            className="mt-3 rounded-full bg-accent px-4 py-2 text-sm text-on-accent shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
           >
             Reveal the entry
           </button>
