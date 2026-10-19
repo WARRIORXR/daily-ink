@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import MoodMap from '../components/MoodMap'
 import OnThisDay from '../components/OnThisDay'
@@ -8,6 +8,8 @@ import { useEntries } from '../hooks/useEntries'
 import { useReviews } from '../hooks/useReviews'
 import { useRoutines } from '../hooks/useRoutines'
 import { useToday } from '../hooks/useToday'
+import { backupReminderDue, recordExport, snoozeBackupReminder } from '../utils/backupReminder'
+import { buildJSONExport, downloadText } from '../utils/exportData'
 import { computeStreaks } from '../utils/streaks'
 import { buildDueQueue } from '../utils/spacedRepetition'
 import { getRoutinesForDate } from '../utils/routines'
@@ -22,7 +24,8 @@ function greeting() {
 
 export default function Home() {
   const today = useToday()
-  const { entries, loading } = useEntries()
+  const { entries, tasks, loading } = useEntries()
+  const [reminderHidden, setReminderHidden] = useState(false)
   const { reviews } = useReviews()
   const { routines, toggleCompletion } = useRoutines()
 
@@ -58,6 +61,22 @@ export default function Home() {
   }
 
   const hasEntry = Boolean(entries[today.key])
+  const backupDue = !reminderHidden && backupReminderDue(Object.keys(entries).length > 0)
+
+  function backUpNow() {
+    downloadText(
+      `daily-ink-export-${today.key}.json`,
+      JSON.stringify(buildJSONExport(entries, tasks, reviews), null, 2),
+      'application/json',
+    )
+    recordExport()
+    setReminderHidden(true)
+  }
+
+  function remindLater() {
+    snoozeBackupReminder()
+    setReminderHidden(true)
+  }
 
   return (
     <div className="animate-fade-up space-y-6 sm:space-y-8">
@@ -75,6 +94,37 @@ export default function Home() {
           One page a day. Quiet, private, and yours.
         </p>
       </header>
+
+      {backupDue ? (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-3 rounded-2xl border border-clay/30 bg-clay-soft px-4 py-3 text-sm"
+        >
+          <p className="min-w-0 flex-1 text-ink">
+            💾{' '}
+            {backupDue.daysSince === null
+              ? "You haven't backed up your journal yet."
+              : `Your last backup was ${backupDue.daysSince} days ago.`}{' '}
+            <span className="text-muted">A copy on your device keeps your pages safe.</span>
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={backUpNow}
+              className="rounded-full bg-accent px-4 py-2 text-sm text-on-accent transition hover:opacity-90"
+            >
+              Back up now
+            </button>
+            <button
+              type="button"
+              onClick={remindLater}
+              className="rounded-full px-3 py-2 text-sm text-muted transition hover:text-ink"
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Streak */}
       <StreakBadge current={stats.current} missedToday={stats.missedToday} />

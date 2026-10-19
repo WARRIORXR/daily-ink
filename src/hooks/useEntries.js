@@ -2,18 +2,46 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../config/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { idbGet, idbSet, isQuotaError } from '../utils/idb'
+import { combineImport } from '../utils/importData'
 
 const STORAGE_KEY = 'daily-ink:data:v1'
 
-function readLocal() {
+function readLegacy() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { entries: {}, tasks: {} }
+    if (!raw) return null
     const parsed = JSON.parse(raw)
     return { entries: parsed.entries ?? {}, tasks: parsed.tasks ?? {} }
   } catch {
-    return { entries: {}, tasks: {} }
+    return null
   }
+}
+
+// Local-mode data lives in IndexedDB. Data from older versions is copied over
+// from localStorage once, and the old copy is removed only after the new one
+// reads back identical. Without IndexedDB everything stays in localStorage.
+let localBackend = 'idb'
+
+async function readLocal() {
+  try {
+    const stored = await idbGet(STORAGE_KEY)
+    if (stored) return { entries: stored.entries ?? {}, tasks: stored.tasks ?? {} }
+    const legacy = readLegacy()
+    if (!legacy) return { entries: {}, tasks: {} }
+    await idbSet(STORAGE_KEY, legacy)
+    const check = await idbGet(STORAGE_KEY)
+    if (JSON.stringify(check) === JSON.stringify(legacy)) localStorage.removeItem(STORAGE_KEY)
+    return legacy
+  } catch {
+    localBackend = 'localStorage'
+    return readLegacy() ?? { entries: {}, tasks: {} }
+  }
+}
+
+async function writeLocal(data) {
+  if (localBackend === 'idb') return idbSet(STORAGE_KEY, data)
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
 }
 
 function errorMessage(err, fallback) {
@@ -97,12 +125,22 @@ export function useEntries() {
     tasksRef.current = tasks
   }, [tasks])
 
-  const persistLocal = useCallback((nextEntries, nextTasks) => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ entries: nextEntries, tasks: nextTasks }),
-    )
-  }, [])
+  const persistLocal = useCallback(
+    (nextEntries, nextTasks) =>
+      writeLocal({ entries: nextEntries, tasks: nextTasks }).then(
+        () => true,
+        (err) => {
+          toast(
+            isQuotaError(err)
+              ? 'Storage is full. Export a backup and free some space, or this page may not be saved.'
+              : 'Could not save on this device',
+            'error',
+          )
+          return false
+        },
+      ),
+    [toast],
+  )
 
   const load = useCallback(async () => {
     const scope = mode === 'server' ? user.id : 'local'
@@ -112,7 +150,7 @@ export function useEntries() {
     setError(null)
 
     if (mode !== 'server') {
-      const data = readLocal()
+      const data = await readLocal()
       setEntries(data.entries)
       setTasks(data.tasks)
       setLoading(false)
@@ -347,5 +385,76 @@ export function useEntries() {
     [mode, user, toast, persistLocal],
   )
 
-  return { entries, tasks, loading, error, saveEntry, deleteEntry, saveTasks, reload: load }
+  /** Import parsed export data with strategy 'merge' or 'replace'. Returns true on success. */
+  const importData = useCallback(
+    async (imported, strategy) => {
+      const current = { entries: entriesRef.current, tasks: tasksRef.current }
+      const next = combineImport(current, imported, strategy)
+
+      if (mode !== 'server') {
+        if (!(await persistLocal(next.entries, next.tasks))) return false
+        entriesRef.current = next.entries
+        tasksRef.current = next.tasks
+        setEntries(next.entries)
+        setTasks(next.tasks)
+        return true
+      }
+
+      try {
+        if (strategy === 'replace') {
+          const { error: tasksError } = await supabase.from('tasks').delete().eq('user_id', user.id)
+          if (tasksError) throw tasksError
+          const { error: entriesError } = await supabase.from('entries').delete().eq('user_id', user.id)
+          if (entriesError) throw entriesError
+        }
+        const newDates = Object.keys(next.entries).filter(
+          (date) => strategy === 'replace' || !current.entries[date],
+        )
+        const entryRows = newDates.map((date) => ({
+          user_id: user.id,
+          entry_date: date,
+          content: next.entries[date].content,
+          mood: next.entries[date].mood ?? null,
+          encrypted: next.entries[date].encrypted ?? false,
+        }))
+        const taskRows = Object.entries(next.tasks)
+          .filter(([date]) => strategy === 'replace' || !current.tasks[date]?.length)
+          .flatMap(([date, list]) =>
+            list.map((t) => ({ user_id: user.id, entry_date: date, title: t.title, done: t.done, position: t.position })),
+          )
+        // Batches keep each request small for journals with thousands of days.
+        for (let i = 0; i < entryRows.length; i += 500) {
+          const { error } = await supabase
+            .from('entries')
+            .upsert(entryRows.slice(i, i + 500), { onConflict: 'user_id,entry_date' })
+          if (error) throw error
+        }
+        for (let i = 0; i < taskRows.length; i += 500) {
+          const { error } = await supabase.from('tasks').insert(taskRows.slice(i, i + 500))
+          if (error) throw error
+        }
+        loadedFor.current = null
+        await load()
+        return true
+      } catch (err) {
+        toast(errorMessage(err, 'Import failed'), 'error')
+        loadedFor.current = null
+        await load()
+        return false
+      }
+    },
+    [mode, user, toast, persistLocal, load],
+  )
+
+  return {
+    entries,
+    tasks,
+    loading,
+    error,
+    saveEntry,
+    deleteEntry,
+    saveTasks,
+    importData,
+    reload: load,
+  }
 }

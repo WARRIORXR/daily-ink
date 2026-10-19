@@ -13,7 +13,9 @@ import {
   buildMarkdownExport,
   downloadText,
 } from '../utils/exportData'
+import { recordExport } from '../utils/backupReminder'
 import { getEntryKey } from '../utils/formatDate'
+import { parseImport } from '../utils/importData'
 
 const inputClass =
   'w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-ink outline-none ring-accent/30 placeholder:text-faint focus:ring-4'
@@ -49,7 +51,9 @@ export default function Settings() {
   const { user, username, signOut } = useAuth()
   const { theme, setMode } = useTheme()
   const { toast } = useToast()
-  const { entries, tasks } = useEntries()
+  const { entries, tasks, importData } = useEntries()
+  const [pendingImport, setPendingImport] = useState(null)
+  const [importing, setImporting] = useState(false)
   const { reviews } = useReviews()
 
   const encryption = useEncryption()
@@ -150,11 +154,50 @@ export default function Settings() {
           'text/markdown',
         )
       }
+      recordExport()
       toast('Export downloaded', 'success')
     } catch {
       toast('Export failed', 'error')
     }
   }
+
+  async function handleImportFile(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const parsed = parseImport(await file.text())
+      if (!Object.keys(parsed.entries).length) {
+        toast('No entries found in that file', 'error')
+        return
+      }
+      setPendingImport({ name: file.name, ...parsed })
+    } catch (err) {
+      toast(err?.message ?? 'Could not read that file', 'error')
+    }
+  }
+
+  async function handleImport(strategy) {
+    if (
+      strategy === 'replace' &&
+      !window.confirm(
+        'Replace your whole journal with this file? Entries and tasks not in the file will be deleted. Export a backup first if unsure.',
+      )
+    ) {
+      return
+    }
+    setImporting(true)
+    const ok = await importData(pendingImport, strategy)
+    setImporting(false)
+    if (!ok) return
+    setPendingImport(null)
+    toast(strategy === 'replace' ? 'Journal replaced from file' : 'Entries merged in', 'success')
+  }
+
+  const importCount = pendingImport ? Object.keys(pendingImport.entries).length : 0
+  const importNew = pendingImport
+    ? Object.keys(pendingImport.entries).filter((date) => !entries[date]).length
+    : 0
 
   return (
     <div className="animate-fade-up space-y-6">
@@ -502,7 +545,7 @@ export default function Settings() {
       {/* Data export */}
       <Section
         title="Your Data"
-        description="Everything you write is yours. Export it any time — JSON for archives, Markdown for reading."
+        description="Everything you write is yours. Export it any time (JSON for archives, Markdown for reading) and import a JSON export back."
       >
         <div className="flex flex-wrap gap-2">
           <button
@@ -519,7 +562,69 @@ export default function Settings() {
           >
             Export Markdown
           </button>
+          <label className="cursor-pointer rounded-full border border-border px-5 py-2 text-sm text-muted transition focus-within:ring-2 focus-within:ring-accent hover:bg-surface-2 hover:text-ink">
+            Import JSON
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImportFile}
+              className="sr-only"
+            />
+          </label>
         </div>
+
+        {pendingImport ? (
+          <div className="space-y-3 rounded-xl border border-accent/30 bg-accent-soft p-4 text-sm">
+            <p className="text-ink">
+              <span className="font-medium">{pendingImport.name}</span>: {importCount}{' '}
+              {importCount === 1 ? 'entry' : 'entries'}, {importNew} of them on days you don't
+              have yet.
+            </p>
+            {pendingImport.problems.length ? (
+              <details className="text-xs text-muted">
+                <summary className="cursor-pointer">
+                  {pendingImport.problems.length} row
+                  {pendingImport.problems.length === 1 ? '' : 's'} skipped
+                </summary>
+                <ul className="mt-1 list-disc pl-5">
+                  {pendingImport.problems.slice(0, 20).map((problem) => (
+                    <li key={problem}>{problem}</li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+            <p className="text-xs text-muted">
+              Merge keeps everything you have and adds the missing days. Replace makes the file
+              your whole journal.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={importing}
+                onClick={() => handleImport('merge')}
+                className="rounded-full bg-accent px-4 py-2 text-sm text-on-accent transition hover:opacity-90 disabled:opacity-50"
+              >
+                Merge
+              </button>
+              <button
+                type="button"
+                disabled={importing}
+                onClick={() => handleImport('replace')}
+                className="rounded-full border border-danger/40 px-4 py-2 text-sm text-danger transition hover:bg-danger/10 disabled:opacity-50"
+              >
+                Replace
+              </button>
+              <button
+                type="button"
+                disabled={importing}
+                onClick={() => setPendingImport(null)}
+                className="rounded-full px-4 py-2 text-sm text-muted transition hover:text-ink"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Section>
 
       <p className="text-center text-xs text-faint">
