@@ -7,74 +7,85 @@ import Spinner from '../components/Spinner'
 import { useEntries } from '../hooks/useEntries'
 import { useReviews } from '../hooks/useReviews'
 import { useToast } from '../context/ToastContext'
-import { buildDueQueue, nextReviewSchedule } from '../utils/spacedRepetition'
+import {
+  buildDueQueue,
+  describeInterval,
+  loadReviewCap,
+  nextReviewSchedule,
+  reviewedToday,
+} from '../utils/spacedRepetition'
 
 export default function Review() {
   const { toast } = useToast()
   const { entries, loading: entriesLoading } = useEntries()
   const { reviews, loading: reviewsLoading, upsertReview } = useReviews()
+  const [session, setSession] = useState(null) // today's queue, fixed when the page opens
   const [index, setIndex] = useState(0)
   const [completed, setCompleted] = useState(0)
+  const loading = entriesLoading || reviewsLoading
 
-  const queue = useMemo(
-    () => buildDueQueue(entries, reviews),
-    [entries, reviews],
+  const cap = loadReviewCap()
+  const doneBefore = useMemo(() => (loading ? 0 : reviewedToday(reviews)), [loading, reviews])
+  const due = useMemo(
+    () => (loading ? [] : buildDueQueue(entries, reviews)),
+    [loading, entries, reviews],
   )
 
-  if (entriesLoading || reviewsLoading) return <Spinner label="Preparing your memories…" />
+  // Freeze the queue once data is in: grading moves an entry's due date, and a
+  // live queue would shift under the current position and skip memories.
+  if (!loading && !session) setSession(due.slice(0, Math.max(0, cap - doneBefore)))
 
-  if (queue.length === 0) {
+  if (loading || !session) return <Spinner label="Preparing your memories…" />
+
+  const finished = index >= session.length
+  if (finished) {
+    const capReached = doneBefore + completed >= cap
+    const waiting = Math.max(0, due.length - (session.length - index))
     return (
       <div className="animate-fade-up space-y-6">
         <PageHeader eyebrow="spaced repetition" title="Review" />
-        <EmptyState emoji="🌤️" title="All caught up">
+        <EmptyState emoji={completed ? '🧠' : '🌤️'} title="All done for today">
           <p>
-            No memories are due right now. Keep writing daily and revisit here — past pages
-            resurface just as you start to forget them.
+            {completed ? `${completed} ${completed === 1 ? 'memory' : 'memories'} refreshed. ` : ''}
+            {capReached && waiting
+              ? `You've reached today's limit of ${cap}. ${waiting} more will wait for tomorrow.`
+              : 'Nothing else is due. Past pages come back just as you start to forget them.'}
           </p>
-          <Link to="/journal" className="mt-4 inline-block text-sm text-accent underline">
-            Write today’s page
-          </Link>
+          <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm">
+            <Link to="/journal" className="text-accent underline">
+              Write today’s page
+            </Link>
+            <Link to="/settings" className="text-muted underline">
+              Change the daily limit
+            </Link>
+          </div>
         </EmptyState>
       </div>
     )
   }
 
-  const item = queue[index]
+  const item = session[index]
   const entry = entries[item.dateKey]
   const otherKeys = Object.keys(entries)
+  const current = item.review
+    ? {
+        repetitions: item.review.repetitions,
+        easeFactor: item.review.easeFactor,
+        intervalDays: item.review.intervalDays,
+      }
+    : undefined
+  const previews = Object.fromEntries(
+    [0, 1, 2, 3].map((grade) => [
+      grade,
+      describeInterval(nextReviewSchedule(current, grade).intervalDays),
+    ]),
+  )
 
   function handleGrade(grade) {
-    const current = item.review
-    const schedule = nextReviewSchedule(
-      current
-        ? { repetitions: current.repetitions, easeFactor: current.easeFactor }
-        : undefined,
-      grade,
-    )
-    upsertReview(item.dateKey, schedule)
+    upsertReview(item.dateKey, nextReviewSchedule(current, grade))
     setCompleted((c) => c + 1)
-
-    if (index + 1 < queue.length) {
-      setIndex((i) => i + 1)
-    } else {
-      toast('Review complete — memories refreshed', 'success')
-      setCompleted((c) => c + 1)
-      setIndex(-1) // sentinel: show completion
-    }
-  }
-
-  if (index === -1 || index >= queue.length) {
-    return (
-      <div className="animate-fade-up space-y-6">
-        <EmptyState emoji="🧠" title="Review complete">
-          <p>{completed} memories refreshed. Come back tomorrow for more.</p>
-          <Link to="/" className="mt-4 inline-block text-sm text-accent underline">
-            Back to today
-          </Link>
-        </EmptyState>
-      </div>
-    )
+    setIndex((i) => i + 1)
+    if (index + 1 >= session.length) toast('Review complete — memories refreshed', 'success')
   }
 
   return (
@@ -82,7 +93,7 @@ export default function Review() {
       <PageHeader
         eyebrow="spaced repetition"
         title="Review"
-        description={`${queue.length - index} of ${queue.length} memories left`}
+        description={`${session.length - index} of ${session.length} left today`}
       />
       <ReviewSession
         key={item.dateKey}
@@ -90,8 +101,9 @@ export default function Review() {
         entry={entry}
         otherKeys={otherKeys}
         index={index}
-        total={queue.length}
+        total={session.length}
         onGrade={handleGrade}
+        previews={previews}
       />
     </div>
   )

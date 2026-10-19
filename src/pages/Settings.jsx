@@ -17,6 +17,7 @@ import {
 import { recordExport } from '../utils/backupReminder'
 import { getEntryKey } from '../utils/formatDate'
 import { parseImport } from '../utils/importData'
+import { DEFAULT_REVIEW_CAP, loadReviewCap, saveReviewCap } from '../utils/spacedRepetition'
 import { isIOS, isStandalone } from '../utils/install'
 
 const inputClass =
@@ -56,6 +57,7 @@ export default function Settings() {
   const { entries, tasks, importData, saveEntry, mode: storageMode } = useEntries()
   const [pendingImport, setPendingImport] = useState(null)
   const [importing, setImporting] = useState(false)
+  const [reviewCap, setReviewCap] = useState(loadReviewCap)
   const { reviews } = useReviews()
 
   const encryption = useEncryption()
@@ -594,6 +596,38 @@ export default function Settings() {
             </button>
           </div>
         )}
+      </Section>
+
+      {/* Reviews */}
+      <Section
+        title="Reviews"
+        description="Past pages come back on a standard SM-2 schedule. Choose how many to review per day."
+      >
+        <Row
+          label={
+            <label htmlFor="review-cap" className="text-sm text-ink">
+              Daily review limit
+            </label>
+          }
+        >
+          <input
+            id="review-cap"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={200}
+            value={reviewCap}
+            onChange={(event) => {
+              const value = Math.round(Number(event.target.value))
+              if (!Number.isFinite(value)) return
+              const clamped = Math.min(200, Math.max(1, value))
+              setReviewCap(clamped)
+              saveReviewCap(clamped)
+            }}
+            className="min-h-11 w-24 rounded-xl border border-border bg-surface px-3 py-2 text-center text-sm text-ink outline-none ring-accent/30 focus:ring-4"
+          />
+        </Row>
+        <p className="text-xs text-faint">Default {DEFAULT_REVIEW_CAP}. Extra memories wait for the next day.</p>
       </Section>
 
       {/* Install */}

@@ -111,9 +111,6 @@ pub fn heatmap(
 // ── Spaced repetition ──────────────────────────────────────────────────────
 
 const MIN_EASE: f64 = 1.3;
-/// SM-2-ish ladder: a first review lands on the grade's own interval
-/// (again 1d / hard 3d / good 7d / easy 14d); later reviews climb.
-const INTERVALS: [i64; 8] = [1, 3, 7, 14, 30, 60, 120, 240];
 
 #[derive(Debug, PartialEq)]
 pub struct Schedule {
@@ -123,18 +120,42 @@ pub struct Schedule {
     pub due_date: String,
 }
 
-/// Advance a schedule from a self-grade: 0 again, 1 hard, 2 good, 3 easy.
-pub fn next_review(repetitions: u32, ease_factor: f64, grade: u8, today: &str) -> Schedule {
-    let (reps, ef) = match grade {
-        0 => (0, (ease_factor - 0.2).max(MIN_EASE)),
-        1 => ((repetitions + 1).max(1), (ease_factor - 0.15).max(MIN_EASE)),
-        2 => ((repetitions + 1).max(2), ease_factor),
-        _ => ((repetitions + 1).max(3), ease_factor + 0.15),
+/// SM-2 quality (0-5) for the four buttons: Again, Hard, Good, Easy.
+pub fn quality_for(grade: u8) -> u8 {
+    match grade {
+        0 => 1,
+        1 => 3,
+        2 => 4,
+        _ => 5,
+    }
+}
+
+/// Standard SM-2 (Wozniak, 1990). `interval_days` is the previous interval.
+/// - quality < 3 (Again): start over, see it again tomorrow.
+/// - otherwise: 1 day, then 6 days, then previous interval × ease factor.
+/// - the ease factor moves by 0.1 − (5 − q)(0.08 + (5 − q)·0.02), never below 1.3.
+pub fn next_review(
+    repetitions: u32,
+    ease_factor: f64,
+    interval_days: i64,
+    grade: u8,
+    today: &str,
+) -> Schedule {
+    let q = quality_for(grade) as f64;
+    let ease = (ease_factor + 0.1 - (5.0 - q) * (0.08 + (5.0 - q) * 0.02)).max(MIN_EASE);
+    let (reps, interval) = if q < 3.0 {
+        (0, 1)
+    } else {
+        let interval = match repetitions {
+            0 => 1,
+            1 => 6,
+            _ => ((interval_days.max(1) as f64) * ease_factor).round() as i64,
+        };
+        (repetitions + 1, interval)
     };
-    let interval = INTERVALS[(reps as usize).min(INTERVALS.len() - 1)];
     Schedule {
         repetitions: reps,
-        ease_factor: (ef * 100.0).round() / 100.0,
+        ease_factor: (ease * 100.0).round() / 100.0,
         interval_days: interval,
         due_date: add_days(today, interval).unwrap_or_else(|| today.to_string()),
     }
@@ -348,15 +369,44 @@ mod tests {
     }
 
     #[test]
-    fn review_ladder() {
-        let s = next_review(0, 2.5, 2, "2026-10-19");
+    fn sm2_first_reviews_are_1_then_6_days() {
+        let s = next_review(0, 2.5, 0, 2, "2026-10-19"); // Good
         assert_eq!(
             (s.repetitions, s.interval_days, s.due_date.as_str()),
-            (2, 7, "2026-10-26")
+            (1, 1, "2026-10-20")
         );
-        let s = next_review(5, 1.35, 0, "2026-10-19");
-        assert_eq!((s.repetitions, s.ease_factor, s.interval_days), (0, 1.3, 1));
-        assert_eq!(next_review(9, 2.5, 3, "2026-10-19").interval_days, 240);
+        assert_eq!(s.ease_factor, 2.5); // q = 4 leaves the ease unchanged
+        let s = next_review(1, 2.5, 1, 2, "2026-10-20");
+        assert_eq!((s.repetitions, s.interval_days), (2, 6));
+    }
+
+    #[test]
+    fn sm2_later_reviews_multiply_by_the_ease_factor() {
+        let s = next_review(2, 2.5, 6, 2, "2026-10-19");
+        assert_eq!((s.repetitions, s.interval_days), (3, 15)); // 6 × 2.5
+        let s = next_review(3, 2.5, 15, 3, "2026-10-19"); // Easy
+        assert_eq!((s.interval_days, s.ease_factor), (38, 2.6)); // round(15 × 2.5), ease + 0.1
+    }
+
+    #[test]
+    fn sm2_hard_lowers_ease_and_again_resets() {
+        let s = next_review(3, 2.5, 15, 1, "2026-10-19"); // Hard, q = 3
+        assert_eq!((s.repetitions, s.ease_factor), (4, 2.36));
+        let s = next_review(5, 2.5, 40, 0, "2026-10-19"); // Again, q = 1
+        assert_eq!(
+            (s.repetitions, s.interval_days, s.due_date.as_str()),
+            (0, 1, "2026-10-20")
+        );
+        assert_eq!(s.ease_factor, 1.96); // 2.5 − 0.54
+    }
+
+    #[test]
+    fn sm2_ease_never_drops_below_1_3() {
+        let mut ease = 2.5;
+        for _ in 0..20 {
+            ease = next_review(0, ease, 1, 0, "2026-10-19").ease_factor;
+        }
+        assert_eq!(ease, 1.3);
     }
 
     #[test]
