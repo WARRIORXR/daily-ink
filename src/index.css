@@ -1,9 +1,15 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Source Serif 4', Georgia, 'Times New Roman', serif;
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-hand: 'Caveat', 'Segoe Script', cursive;
+  /* Minimal type: system sans for the interface, one serif for writing. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-hand: var(--font-display);
+
+  /* Flatter corners everywhere. */
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.5rem;
+  --radius-3xl: 0.625rem;
 
   /* Semantic colors — resolved at runtime so .dark flips everything at once. */
   --color-bg: var(--bg);
@@ -22,10 +28,10 @@
   --color-danger: var(--danger);
   --color-warn: var(--warn);
 
-  --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.05), 0 10px 28px -14px rgba(28, 25, 23, 0.14);
-  --shadow-pop: 0 6px 16px -6px rgba(28, 25, 23, 0.18), 0 24px 48px -20px rgba(28, 25, 23, 0.28);
-  /* Soft inner highlight used on the auth panel and hero cards */
-  --shadow-glow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  /* Borders do the separating; shadows stay out of the way. */
+  --shadow-card: none;
+  --shadow-pop: 0 8px 24px -12px rgba(0, 0, 0, 0.18);
+  --shadow-glow: none;
 
   --animate-fade-in: fade-in 0.25s ease both;
   --animate-fade-up: fade-up 0.35s ease both;
@@ -72,36 +78,36 @@
 }
 
 :root {
-  --bg: #faf6ef;
-  --surface: #fffdf7;
-  --surface-2: #f0e9dc;
-  --ink: #1c1917;
-  --muted: #57534e;
-  --faint: #a8a29e;
-  --border: #e7e0d2;
-  --accent: #b45309;
-  --accent-soft: rgba(180, 83, 9, 0.12);
-  --on-accent: #fffbeb;
-  --clay: #b4533a;
-  --clay-soft: rgba(180, 83, 58, 0.12);
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --surface-2: #f2f2f0;
+  --ink: #18181b;
+  --muted: #52525b;
+  --faint: #a1a1aa;
+  --border: #e4e4e7;
+  --accent: #18181b;
+  --accent-soft: rgba(24, 24, 27, 0.06);
+  --on-accent: #fafafa;
+  --clay: #52525b;
+  --clay-soft: rgba(82, 82, 91, 0.08);
   --success: #15803d;
   --danger: #b91c1c;
   --warn: #92400e;
 }
 
 .dark {
-  --bg: #14120f;
-  --surface: #1e1b16;
-  --surface-2: #2c271e;
-  --ink: #ece5d8;
-  --muted: #a8a29e;
-  --faint: #6e675e;
-  --border: #342e25;
-  --accent: #d97706;
-  --accent-soft: rgba(217, 119, 6, 0.16);
-  --on-accent: #1c1917;
-  --clay: #e07a5f;
-  --clay-soft: rgba(224, 122, 95, 0.16);
+  --bg: #111113;
+  --surface: #18181b;
+  --surface-2: #232326;
+  --ink: #ececee;
+  --muted: #a1a1aa;
+  --faint: #63636b;
+  --border: #2a2a2e;
+  --accent: #ececee;
+  --accent-soft: rgba(236, 236, 238, 0.08);
+  --on-accent: #111113;
+  --clay: #a1a1aa;
+  --clay-soft: rgba(161, 161, 170, 0.1);
   --success: #4ade80;
   --danger: #f87171;
   --warn: #fbbf24;
@@ -131,17 +137,6 @@ body {
   transition:
     background-color 0.3s ease,
     color 0.3s ease;
-}
-
-/* Subtle paper grain over everything — set-and-forget texture. */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  pointer-events: none;
-  opacity: 0.4;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
 }
 
 ::selection {
@@ -179,51 +174,16 @@ body::after {
   display: none;
 }
 
-/* Ruled-paper background for the journal editor. */
+/* Journal editor: a plain page. */
 .editor-paper {
   background-color: var(--surface);
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent,
-    transparent 39px,
-    color-mix(in srgb, var(--accent) 9%, transparent) 39px,
-    color-mix(in srgb, var(--accent) 9%, transparent) 40px
-  );
-  background-attachment: local;
 }
 
-/* Warm radial wash — brand panel, hero cards, auth screens. */
+/* Kept as no-ops so older markup still renders cleanly. */
 .paper-wash {
-  background-image:
-    radial-gradient(
-      120% 90% at 12% 0%,
-      color-mix(in srgb, var(--accent) 14%, transparent) 0%,
-      transparent 55%
-    ),
-    radial-gradient(
-      90% 70% at 100% 100%,
-      color-mix(in srgb, var(--clay) 12%, transparent) 0%,
-      transparent 60%
-    );
+  background: none;
 }
 
-/* Thin gradient rule used under page titles. */
 .hairline {
-  height: 1px;
-  background-image: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--accent) 55%, transparent),
-    transparent
-  );
-}
-
-/* Drop cap for revealed memory entries. */
-.drop-cap::first-letter {
-  float: left;
-  font-family: var(--font-display);
-  font-size: 3.1em;
-  line-height: 0.82;
-  padding-right: 0.09em;
-  padding-top: 0.06em;
-  color: var(--accent);
+  display: none;
 }

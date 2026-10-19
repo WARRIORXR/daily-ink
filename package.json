@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:core": "node scripts/build-core.mjs",
+    "test": "cargo test --manifest-path core/Cargo.toml && python -m unittest discover tests",
+    "backup": "python tools/backup.py",
+    "icons": "python scripts/generate_icons.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

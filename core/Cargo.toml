@@ -1,0 +1,19 @@
+[package]
+name = "daily-ink-core"
+version = "0.1.0"
+edition = "2021"
+description = "Daily Ink app logic: dates, streaks, spaced repetition, routines and quiz, compiled to WebAssembly."
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "=0.2.100"
+serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1

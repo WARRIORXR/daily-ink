@@ -105,17 +105,7 @@ export default function EntryEditor({ dateKey }) {
       <label htmlFor="entry-content" className="sr-only">
         Journal entry
       </label>
-      <div className="overflow-hidden rounded-2xl border border-border shadow-card">
-        {/* Decorative top bar */}
-        <div
-          aria-hidden="true"
-          className="flex h-8 items-center gap-1.5 border-b border-border bg-surface-2/50 px-4"
-        >
-          <span className="h-2.5 w-2.5 rounded-full bg-danger/50" />
-          <span className="h-2.5 w-2.5 rounded-full bg-accent/50" />
-          <span className="h-2.5 w-2.5 rounded-full bg-success/50" />
-          <span className="ml-2 font-hand text-sm text-faint">dear diary…</span>
-        </div>
+      <div className="overflow-hidden rounded-2xl border border-border">
         <textarea
           id="entry-content"
           value={content}
@@ -125,7 +115,7 @@ export default function EntryEditor({ dateKey }) {
               ? 'What stayed with you today?'
               : `What happened on ${formatEntryDate(dateKey)}?`
           }
-          className="editor-paper min-h-[28rem] w-full resize-y px-5 py-4 text-lg sm:text-xl leading-10 sm:leading-12 text-ink outline-none ring-accent/30 placeholder:text-faint focus:ring-4"
+          className="editor-paper min-h-[28rem] w-full resize-y px-5 py-4 font-display text-lg leading-8 text-ink outline-none placeholder:text-faint focus:ring-2 ring-accent/20"
           rows={10}
         />
       </div>
@@ -142,9 +132,6 @@ export default function EntryEditor({ dateKey }) {
         >
           Delete entry
         </button>
-        <p aria-hidden="true" className="font-hand text-lg text-faint">
-          written with care
-        </p>
       </div>
     </div>
   )

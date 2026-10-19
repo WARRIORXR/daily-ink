@@ -11,7 +11,7 @@ export default function EntryCard({ dateKey, entry, tasks = [], compact = false 
   return (
     <Link
       to={`/journal/${dateKey}`}
-      className="group block rounded-2xl border border-border bg-surface p-5 shadow-card transition duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-pop"
+      className="group block rounded-2xl border border-border bg-surface p-5 shadow-card transition duration-200 hover:border-accent/40"
     >
       <div className="flex items-center gap-3">
         {mood ? (

@@ -5,6 +5,7 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
+import { ready as coreReady } from './core'
 import './index.css'
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
@@ -14,6 +15,9 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     })
   })
 }
+
+// The Rust core (WebAssembly) must be loaded before any screen uses it.
+await coreReady
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

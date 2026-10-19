@@ -45,7 +45,7 @@ export default function ReviewSession({ dateKey, entry, otherKeys, index, total,
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-3 flex items-center justify-between text-sm text-muted">
-        <p className="font-hand text-2xl text-accent">memory {index + 1} of {total}</p>
+        <p className="text-xs uppercase tracking-wider text-muted">memory {index + 1} of {total}</p>
         <p className="text-xs uppercase tracking-[0.2em] text-faint">spaced review</p>
       </div>
 
@@ -100,7 +100,7 @@ export default function ReviewSession({ dateKey, entry, otherKeys, index, total,
               </div>
             </header>
 
-            <p className="drop-cap whitespace-pre-wrap leading-relaxed text-ink">
+            <p className="whitespace-pre-wrap leading-relaxed text-ink">
               {text || 'This page was left empty.'}
             </p>
 
@@ -114,7 +114,7 @@ export default function ReviewSession({ dateKey, entry, otherKeys, index, total,
                     key={grade.key}
                     type="button"
                     onClick={() => onGrade(grade.key)}
-                    className={`rounded-xl border bg-surface px-3 py-3 shadow-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 ${grade.className}`}
+                    className={`rounded-xl border bg-surface px-3 py-3 transition duration-150 active:translate-y-0 ${grade.className}`}
                   >
                     <span className="block font-display font-medium">{grade.label}</span>
                     <span className="block text-xs opacity-70">{grade.hint}</span>
