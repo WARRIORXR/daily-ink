@@ -95,10 +95,10 @@
   --surface-2: #2c271e;
   --ink: #ece5d8;
   --muted: #a8a29e;
-  --faint: #6e675e;
+  --faint: #9a9285; /* 4.5:1+ on every dark surface (WCAG AA) */
   --border: #342e25;
-  --accent: #d97706;
-  --accent-soft: rgba(217, 119, 6, 0.16);
+  --accent: #e0800d;
+  --accent-soft: rgba(224, 128, 13, 0.16);
   --on-accent: #1c1917;
   --clay: #e07a5f;
   --clay-soft: rgba(224, 122, 95, 0.16);
@@ -153,6 +153,27 @@ body::after {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Touch screens: every control is at least 44×44px (WCAG 2.5.5). */
+@media (pointer: coarse) {
+  button,
+  select,
+  summary,
+  [role='button'],
+  input:not([type='checkbox'], [type='radio'], [type='range']),
+  nav a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  nav a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  label:has(> input[type='checkbox']) {
+    min-height: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

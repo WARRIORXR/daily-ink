@@ -6,6 +6,21 @@
     <meta name="description" content="Daily Ink — a private daily journal with streaks, on-this-day memories, and spaced-repetition reviews." />
     <meta name="theme-color" content="#1c1917" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="canonical" href="https://daily-ink-three.vercel.app/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Daily Ink" />
+    <meta property="og:title" content="Daily Ink — Memory Journal" />
+    <meta property="og:description" content="A private daily journal with streaks, on-this-day memories and spaced-repetition reviews. Encrypted on your device." />
+    <meta property="og:url" content="https://daily-ink-three.vercel.app/" />
+    <meta property="og:image" content="https://daily-ink-three.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Daily Ink: one page a day" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Daily Ink — Memory Journal" />
+    <meta name="twitter:description" content="A private daily journal with streaks, on-this-day memories and spaced-repetition reviews." />
+    <meta name="twitter:image" content="https://daily-ink-three.vercel.app/og-image.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,6 +35,12 @@
     <title>Daily Ink — Memory Journal</title>
   </head>
   <body>
+    <noscript>
+      <div style="max-width: 32rem; margin: 4rem auto; padding: 0 1rem; font-family: Georgia, serif; color: #1c1917; line-height: 1.6">
+        <h1 style="font-weight: 500">Daily Ink needs JavaScript</h1>
+        <p>Your journal runs and encrypts entirely in your browser, so it can't work with JavaScript turned off. Please enable it and reload the page.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -76,3 +76,18 @@ self.addEventListener('fetch', (event) => {
     }),
   )
 })
+// Daily reminder: tapping it opens (or focuses) the journal.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = event.notification.data?.url || '/journal'
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      const open = list.find((client) => 'focus' in client)
+      if (open) {
+        open.navigate?.(url)
+        return open.focus()
+      }
+      return self.clients.openWindow(url)
+    }),
+  )
+})

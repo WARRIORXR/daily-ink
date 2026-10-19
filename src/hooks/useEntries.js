@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { idbGet, idbSet, isQuotaError } from '../utils/idb'
 import { combineImport } from '../utils/importData'
+import { noteEntries } from '../utils/reminder'
 
 const STORAGE_KEY = 'daily-ink:data:v1'
 
@@ -120,7 +121,8 @@ export function useEntries() {
 
   useEffect(() => {
     entriesRef.current = entries
-  }, [entries])
+    if (!loading) noteEntries(entries)
+  }, [entries, loading])
   useEffect(() => {
     tasksRef.current = tasks
   }, [tasks])

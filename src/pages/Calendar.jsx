@@ -106,6 +106,7 @@ export default function Calendar() {
                     }
                   }}
                   role="button"
+                  aria-pressed={isCompleted}
                   tabIndex={0}
                   className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${
                     isCompleted
