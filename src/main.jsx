@@ -7,6 +7,7 @@ import { ThemeProvider } from './context/ThemeContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { ready as coreReady } from './core'
 import './index.css'
+import './utils/install'
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {

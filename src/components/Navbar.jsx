@@ -1,5 +1,6 @@
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import InstallButton from './InstallButton'
 import ThemeToggle from './ThemeToggle'
 
 const LINKS = [
@@ -73,6 +74,7 @@ export default function Navbar() {
               </ul>
             </nav>
 
+            <InstallButton className="hidden sm:inline-flex" />
             <ThemeToggle />
 
             {user ? (

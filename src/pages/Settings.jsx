@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import InstallButton from '../components/InstallButton'
 import PageHeader from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -16,6 +17,7 @@ import {
 import { recordExport } from '../utils/backupReminder'
 import { getEntryKey } from '../utils/formatDate'
 import { parseImport } from '../utils/importData'
+import { isIOS, isStandalone } from '../utils/install'
 
 const inputClass =
   'w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-ink outline-none ring-accent/30 placeholder:text-faint focus:ring-4'
@@ -590,6 +592,32 @@ export default function Settings() {
             >
               Disable lock
             </button>
+          </div>
+        )}
+      </Section>
+
+      {/* Install */}
+      <Section
+        title="Install Daily Ink"
+        description="Add Daily Ink to your home screen or dock. It opens like an app and works offline once loaded."
+      >
+        {isStandalone() ? (
+          <p className="text-sm text-success">✓ Installed. You're using the app version.</p>
+        ) : (
+          <div className="space-y-2 text-sm text-muted">
+            <InstallButton />
+            {isIOS() ? (
+              <p>
+                On iPhone or iPad: open this page in Safari, tap the Share button, then{' '}
+                <span className="font-medium text-ink">Add to Home Screen</span>.
+              </p>
+            ) : (
+              <p>
+                No button? Use your browser menu's{' '}
+                <span className="font-medium text-ink">Install app</span> or{' '}
+                <span className="font-medium text-ink">Add to Home screen</span> option.
+              </p>
+            )}
           </div>
         )}
       </Section>

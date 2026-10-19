@@ -1,12 +1,20 @@
 /* Daily Ink service worker — offline-first for the app shell, stale-while-revalidate for assets. */
 
-const CACHE_NAME = 'daily-ink-v1'
+// The build replaces these two placeholders (see swPrecache in vite.config.js)
+// with a version and the list of built JS/CSS/WebAssembly files, so the whole
+// app works offline after the first visit and each deploy installs fresh.
+const VERSION = '__BUILD_VERSION__'
+const BUILD_ASSETS = '__BUILD_ASSETS__'
+
+const CACHE_NAME = `daily-ink-${VERSION}`
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/favicon.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  ...(Array.isArray(BUILD_ASSETS) ? BUILD_ASSETS : []),
 ]
 
 self.addEventListener('install', (event) => {
