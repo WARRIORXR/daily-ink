@@ -223,6 +223,23 @@ export function dueQueue(entry_keys, reviews, today) {
 }
 
 /**
+ * `moods` is a list of `[dateKey, mood]` pairs.
+ * @param {any} moods
+ * @param {string} today
+ * @param {number} days
+ * @returns {any}
+ */
+export function moodMap(moods, today, days) {
+    const ptr0 = passStringToWasm0(today, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.moodMap(moods, ptr0, len0, days);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
  * @param {string} start_date
  * @param {number} gap_days
  * @param {boolean} adjust_from_last
@@ -331,6 +348,40 @@ export function quizOptions(date, other_keys, seed) {
     const ptr0 = passStringToWasm0(date, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.quizOptions(ptr0, len0, other_keys, seed);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * @param {string} date
+ * @param {number} offset
+ * @returns {string}
+ */
+export function dailyPrompt(date, offset) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passStringToWasm0(date, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.dailyPrompt(ptr0, len0, offset);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * @param {string} text
+ * @returns {any}
+ */
+export function wordStats(text) {
+    const ptr0 = passStringToWasm0(text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.wordStats(ptr0, len0);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }

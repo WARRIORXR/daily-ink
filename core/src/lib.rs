@@ -3,6 +3,7 @@
 //! `src/utils/` keep the original function names for the React components.
 
 mod date;
+mod insights;
 mod logic;
 
 use logic::Routine;
@@ -114,4 +115,42 @@ pub fn snippet(text: &str, max_chars: usize) -> String {
 #[wasm_bindgen(js_name = quizOptions)]
 pub fn quiz_options(date: &str, other_keys: JsValue, seed: u32) -> Result<JsValue, JsValue> {
     to_js(&logic::quiz_options(date, &from_js::<Vec<String>>(other_keys)?, seed))
+}
+
+#[wasm_bindgen(js_name = dailyPrompt)]
+pub fn daily_prompt(date: &str, offset: i32) -> String {
+    insights::daily_prompt(date, offset.into()).to_string()
+}
+
+#[derive(Serialize)]
+struct WordStatsOut {
+    words: u32,
+    minutes: u32,
+}
+
+#[wasm_bindgen(js_name = wordStats)]
+pub fn word_stats(text: &str) -> Result<JsValue, JsValue> {
+    let (words, minutes) = insights::word_stats(text);
+    to_js(&WordStatsOut { words, minutes })
+}
+
+#[derive(Serialize)]
+struct MoodDay {
+    date: String,
+    mood: Option<String>,
+}
+
+#[derive(Serialize)]
+struct MoodMapOut {
+    days: Vec<MoodDay>,
+    top: Option<String>,
+}
+
+/// `moods` is a list of `[dateKey, mood]` pairs.
+#[wasm_bindgen(js_name = moodMap)]
+pub fn mood_map(moods: JsValue, today: &str, days: u32) -> Result<JsValue, JsValue> {
+    let moods: Vec<(String, String)> = from_js(moods)?;
+    let (cells, top) = insights::mood_map(&moods, today, days);
+    let days = cells.into_iter().map(|(date, mood)| MoodDay { date, mood }).collect();
+    to_js(&MoodMapOut { days, top })
 }
