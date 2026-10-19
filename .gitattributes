@@ -1,0 +1,4 @@
+# Built by wasm-bindgen from core/ (Rust). Excluded from GitHub's language stats.
+src/core/daily_ink_core.js linguist-generated=true
+src/core/daily_ink_core_bg.wasm linguist-generated=true
+package-lock.json linguist-generated=true
