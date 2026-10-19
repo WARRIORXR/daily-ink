@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import { formatEntryDate } from '../utils/formatDate'
 
-export default function StreakBadge({ current, missedToday }) {
+export default function StreakBadge({ current, missedToday, freezeReady, frozen = [] }) {
+  const lastFrozen = frozen.at(-1)
   const ring = current === 0 ? 0 : Math.min((current % 7) / 7, 1) * 360
 
   return (
@@ -43,6 +45,12 @@ export default function StreakBadge({ current, missedToday }) {
                 : missedToday
                   ? 'Write today to keep the flame alive.'
                   : 'The ink is warm today — nice work.'}
+            </p>
+            <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-sky-400/15 px-2.5 py-0.5 text-xs text-ink">
+              <span aria-hidden="true">🧊</span>
+              {freezeReady
+                ? 'Freeze ready: one missed day this week won’t break your streak.'
+                : `Freeze used this week${lastFrozen ? ` on ${formatEntryDate(lastFrozen)}` : ''}.`}
             </p>
           </div>
         </div>

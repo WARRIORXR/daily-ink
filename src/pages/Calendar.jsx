@@ -1,21 +1,25 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import CalendarView from '../components/CalendarView'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
 import RoutineModal from '../components/RoutineModal'
+import YearHeatmap from '../components/YearHeatmap'
 import { useEntries } from '../hooks/useEntries'
 import { useEntryContent } from '../hooks/useEntryContent'
 import { useRoutines } from '../hooks/useRoutines'
 import { formatEntryDate, getEntryKey } from '../utils/formatDate'
 import { moodByKey } from '../utils/moods'
 import { formatIntervalSummary, getRoutinesForDate } from '../utils/routines'
+import { computeStreaks } from '../utils/streaks'
 
 export default function Calendar() {
   const { entries, tasks, loading: entriesLoading } = useEntries()
   const { routines, addRoutine, deleteRoutine, toggleCompletion, loading: routinesLoading } = useRoutines()
   const [selected, setSelected] = useState(getEntryKey(new Date()))
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false)
+  const todayKey = getEntryKey()
+  const frozen = useMemo(() => computeStreaks(Object.keys(entries), todayKey).frozen, [entries, todayKey])
 
   const selectedEntry = entries[selected]
   const selectedTasks = tasks[selected] ?? []
@@ -52,6 +56,9 @@ export default function Calendar() {
           </button>
         }
       />
+
+      {/* 12-month heatmap */}
+      <YearHeatmap entries={entries} frozen={frozen} todayKey={todayKey} />
 
       {/* Monthly Calendar View */}
       <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">

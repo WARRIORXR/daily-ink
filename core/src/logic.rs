@@ -13,35 +13,99 @@ pub struct Streaks {
     pub longest: u32,
     pub total: u32,
     pub missed_today: bool,
+    /// Missed days a freeze covered, oldest first.
+    pub frozen: Vec<String>,
+    /// Whether this week's freeze is still unused.
+    pub freeze_ready: bool,
 }
 
-/// A streak stays alive while yesterday has an entry, even if today is blank.
+/// Monday-based week number (1970-01-01, day 0, was a Thursday).
+fn week_of(day: i64) -> i64 {
+    (day + 3).div_euclid(7)
+}
+
+/// Streaks over local-date keys. A blank today never breaks a streak, and one
+/// "freeze" per calendar week (Monday to Sunday) covers a single missed day
+/// that sits between two written days (or between a written day and today).
+/// A frozen day keeps the streak alive but doesn't add to it.
 pub fn compute_streaks(keys: &[String], today: &str) -> Streaks {
     let days: BTreeSet<i64> = keys.iter().filter_map(|k| parse_key(k)).collect();
-    let today_n = parse_key(today);
+    let Some(today_n) = parse_key(today) else {
+        return Streaks {
+            current: 0,
+            longest: 0,
+            total: days.len() as u32,
+            missed_today: true,
+            frozen: Vec::new(),
+            freeze_ready: false,
+        };
+    };
 
-    let mut current = 0;
-    if let Some(t) = today_n {
-        let mut cursor = if days.contains(&t) { t } else { t - 1 };
-        while days.contains(&cursor) {
-            current += 1;
-            cursor -= 1;
+    let mut used_weeks = BTreeSet::new();
+    let mut frozen = Vec::new();
+    let (mut run, mut longest) = (0u32, 0u32);
+    if let Some(&first) = days.iter().next() {
+        for day in first..=today_n {
+            if days.contains(&day) {
+                run += 1;
+            } else if day == today_n {
+                // Today isn't over yet.
+            } else if !used_weeks.contains(&week_of(day))
+                && days.contains(&(day - 1))
+                && (days.contains(&(day + 1)) || day + 1 == today_n)
+            {
+                used_weeks.insert(week_of(day));
+                frozen.push(day);
+            } else {
+                run = 0;
+            }
+            longest = longest.max(run);
         }
     }
 
-    let (mut longest, mut run, mut prev) = (0, 0, None);
-    for &day in &days {
-        run = if prev == Some(day - 1) { run + 1 } else { 1 };
-        longest = longest.max(run);
-        prev = Some(day);
-    }
-
     Streaks {
-        current,
+        current: run,
         longest,
         total: days.len() as u32,
-        missed_today: today_n.is_none_or(|t| !days.contains(&t)),
+        missed_today: !days.contains(&today_n),
+        frozen: frozen.into_iter().map(format_key).collect(),
+        freeze_ready: !used_weeks.contains(&week_of(today_n)),
     }
+}
+
+/// One cell per day of the heatmap, Monday-aligned columns of 7 days, ending
+/// with the week that holds `today`. `levels` maps a date key to its 1–4
+/// intensity; days after today come back as level -1 so they can be hidden.
+pub fn heatmap(
+    levels: &[(String, u8)],
+    frozen: &[String],
+    today: &str,
+    weeks: u32,
+) -> Vec<(String, i8)> {
+    let Some(end) = parse_key(today) else {
+        return Vec::new();
+    };
+    let by_day: std::collections::BTreeMap<i64, u8> = levels
+        .iter()
+        .filter_map(|(k, l)| parse_key(k).map(|d| (d, *l)))
+        .collect();
+    let frozen: BTreeSet<i64> = frozen.iter().filter_map(|k| parse_key(k)).collect();
+    let last_monday = end - (end + 3).rem_euclid(7);
+    let start = last_monday - 7 * (weeks as i64 - 1);
+    (start..last_monday + 7)
+        .map(|day| {
+            let level = if day > end {
+                -1
+            } else if let Some(&l) = by_day.get(&day) {
+                l.clamp(1, 4) as i8
+            } else if frozen.contains(&day) {
+                5 // frozen marker
+            } else {
+                0
+            };
+            (format_key(day), level)
+        })
+        .collect()
 }
 
 // ── Spaced repetition ──────────────────────────────────────────────────────
@@ -223,16 +287,73 @@ mod tests {
 
     #[test]
     fn streaks_survive_dst_and_blank_today() {
-        let s = compute_streaks(&keys(&["2026-03-07", "2026-03-08", "2026-03-09"]), "2026-03-10");
-        assert_eq!(s, Streaks { current: 3, longest: 3, total: 3, missed_today: true });
+        let s = compute_streaks(
+            &keys(&["2026-03-07", "2026-03-08", "2026-03-09"]),
+            "2026-03-10",
+        );
+        assert_eq!(
+            (s.current, s.longest, s.total, s.missed_today),
+            (3, 3, 3, true)
+        );
+        assert!(s.frozen.is_empty() && s.freeze_ready);
+    }
+
+    #[test]
+    fn one_freeze_per_week_bridges_a_single_missed_day() {
+        // Thu 1 Jan 2026 written, Fri 2 missed, Sat 3 written: frozen.
         let s = compute_streaks(&keys(&["2026-01-01", "2026-01-03"]), "2026-01-03");
-        assert_eq!((s.current, s.longest), (1, 1));
+        assert_eq!((s.current, s.longest), (2, 2));
+        assert_eq!(s.frozen, vec!["2026-01-02".to_string()]);
+        assert!(!s.freeze_ready);
+        // A second miss in the same week (Mon 5 Jan is a new week, so use Tue/Thu).
+        let s = compute_streaks(
+            &keys(&["2026-01-05", "2026-01-07", "2026-01-09"]),
+            "2026-01-09",
+        );
+        assert_eq!(s.frozen, vec!["2026-01-06".to_string()]);
+        assert_eq!(s.current, 1); // Thu 8 Jan can't be frozen too
+        assert_eq!(s.longest, 2);
+        // Two missed days in a row break the streak.
+        let s = compute_streaks(&keys(&["2026-01-05", "2026-01-08"]), "2026-01-08");
+        assert_eq!((s.current, s.frozen.len()), (1, 0));
+    }
+
+    #[test]
+    fn yesterday_missed_can_be_frozen_while_today_is_blank() {
+        // Mon 12 Oct and Tue 13 written, Wed 14 missed, today Thu 15 blank.
+        let s = compute_streaks(&keys(&["2026-10-12", "2026-10-13"]), "2026-10-15");
+        assert_eq!((s.current, s.missed_today), (2, true));
+        assert_eq!(s.frozen, vec!["2026-10-14".to_string()]);
+        // Without a written day before the miss there's nothing to protect.
+        assert_eq!(
+            compute_streaks(&keys(&["2026-10-10"]), "2026-10-15").current,
+            0
+        );
+    }
+
+    #[test]
+    fn heatmap_is_monday_aligned_and_ends_this_week() {
+        let cells = heatmap(
+            &[("2026-10-19".into(), 3)],
+            &["2026-10-18".into()],
+            "2026-10-21",
+            2,
+        );
+        assert_eq!(cells.len(), 14);
+        assert_eq!(cells[0].0, "2026-10-12"); // a Monday
+        assert_eq!(cells[7], ("2026-10-19".to_string(), 3));
+        assert_eq!(cells[6], ("2026-10-18".to_string(), 5));
+        assert_eq!(cells[13], ("2026-10-25".to_string(), -1));
+        assert_eq!(cells[8].1, 0);
     }
 
     #[test]
     fn review_ladder() {
         let s = next_review(0, 2.5, 2, "2026-10-19");
-        assert_eq!((s.repetitions, s.interval_days, s.due_date.as_str()), (2, 7, "2026-10-26"));
+        assert_eq!(
+            (s.repetitions, s.interval_days, s.due_date.as_str()),
+            (2, 7, "2026-10-26")
+        );
         let s = next_review(5, 1.35, 0, "2026-10-19");
         assert_eq!((s.repetitions, s.ease_factor, s.interval_days), (0, 1.3, 1));
         assert_eq!(next_review(9, 2.5, 3, "2026-10-19").interval_days, 240);
@@ -242,21 +363,35 @@ mod tests {
     fn queue_is_oldest_first_and_skips_today() {
         let q = due_queue(
             &keys(&["2026-10-19", "2026-10-10", "2026-10-01"]),
-            &[("2026-10-01".into(), "2026-10-18".into()), ("2026-09-01".into(), "2026-11-01".into())],
+            &[
+                ("2026-10-01".into(), "2026-10-18".into()),
+                ("2026-09-01".into(), "2026-11-01".into()),
+            ],
             "2026-10-19",
         );
-        assert_eq!(q, vec![("2026-10-01".into(), true), ("2026-10-10".into(), false)]);
+        assert_eq!(
+            q,
+            vec![("2026-10-01".into(), true), ("2026-10-10".into(), false)]
+        );
     }
 
     #[test]
     fn routines() {
         let done = keys(&["2026-10-05"]);
-        let r = Routine { start_date: "2026-10-01", gap_days: 2, adjust_from_last: true, completions: &done };
+        let r = Routine {
+            start_date: "2026-10-01",
+            gap_days: 2,
+            adjust_from_last: true,
+            completions: &done,
+        };
         assert!(routine_on(&r, "2026-10-05"));
         assert!(routine_on(&r, "2026-10-08"));
         assert!(!routine_on(&r, "2026-10-07"));
         assert!(!routine_on(&r, "2026-09-30"));
-        assert_eq!(next_routine_date(&r, "2026-10-06").as_deref(), Some("2026-10-08"));
+        assert_eq!(
+            next_routine_date(&r, "2026-10-06").as_deref(),
+            Some("2026-10-08")
+        );
         assert_eq!(interval_summary(3), "Every 4 days (3 days gap)");
     }
 

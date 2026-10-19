@@ -25,6 +25,8 @@ struct StreaksOut {
     longest: u32,
     total: u32,
     missed_today: bool,
+    frozen: Vec<String>,
+    freeze_ready: bool,
 }
 
 #[wasm_bindgen(js_name = computeStreaks)]
@@ -35,7 +37,23 @@ pub fn compute_streaks(keys: JsValue, today: &str) -> Result<JsValue, JsValue> {
         longest: s.longest,
         total: s.total,
         missed_today: s.missed_today,
+        frozen: s.frozen,
+        freeze_ready: s.freeze_ready,
     })
+}
+
+/// `levels` is a list of `[dateKey, level 1-4]` pairs. Returns `[dateKey, level]`
+/// pairs in Monday-first columns; 0 = blank, 5 = frozen, -1 = after today.
+#[wasm_bindgen]
+pub fn heatmap(
+    levels: JsValue,
+    frozen: JsValue,
+    today: &str,
+    weeks: u32,
+) -> Result<JsValue, JsValue> {
+    let levels: Vec<(String, u8)> = from_js(levels)?;
+    let frozen: Vec<String> = from_js(frozen)?;
+    to_js(&logic::heatmap(&levels, &frozen, today, weeks))
 }
 
 #[derive(Serialize)]
@@ -48,7 +66,12 @@ struct ScheduleOut {
 }
 
 #[wasm_bindgen(js_name = nextReview)]
-pub fn next_review(repetitions: u32, ease_factor: f64, grade: u8, today: &str) -> Result<JsValue, JsValue> {
+pub fn next_review(
+    repetitions: u32,
+    ease_factor: f64,
+    grade: u8,
+    today: &str,
+) -> Result<JsValue, JsValue> {
     let s = logic::next_review(repetitions, ease_factor, grade, today);
     to_js(&ScheduleOut {
         repetitions: s.repetitions,
@@ -77,7 +100,12 @@ pub fn routine_on(
 ) -> Result<bool, JsValue> {
     let completions: Vec<String> = from_js(completions)?;
     Ok(logic::routine_on(
-        &Routine { start_date, gap_days: gap_days.into(), adjust_from_last, completions: &completions },
+        &Routine {
+            start_date,
+            gap_days: gap_days.into(),
+            adjust_from_last,
+            completions: &completions,
+        },
         date,
     ))
 }
@@ -92,7 +120,12 @@ pub fn next_routine_date(
 ) -> Result<Option<String>, JsValue> {
     let completions: Vec<String> = from_js(completions)?;
     Ok(logic::next_routine_date(
-        &Routine { start_date, gap_days: gap_days.into(), adjust_from_last, completions: &completions },
+        &Routine {
+            start_date,
+            gap_days: gap_days.into(),
+            adjust_from_last,
+            completions: &completions,
+        },
         from,
     ))
 }
@@ -114,7 +147,11 @@ pub fn snippet(text: &str, max_chars: usize) -> String {
 
 #[wasm_bindgen(js_name = quizOptions)]
 pub fn quiz_options(date: &str, other_keys: JsValue, seed: u32) -> Result<JsValue, JsValue> {
-    to_js(&logic::quiz_options(date, &from_js::<Vec<String>>(other_keys)?, seed))
+    to_js(&logic::quiz_options(
+        date,
+        &from_js::<Vec<String>>(other_keys)?,
+        seed,
+    ))
 }
 
 #[wasm_bindgen(js_name = dailyPrompt)]
@@ -151,6 +188,9 @@ struct MoodMapOut {
 pub fn mood_map(moods: JsValue, today: &str, days: u32) -> Result<JsValue, JsValue> {
     let moods: Vec<(String, String)> = from_js(moods)?;
     let (cells, top) = insights::mood_map(&moods, today, days);
-    let days = cells.into_iter().map(|(date, mood)| MoodDay { date, mood }).collect();
+    let days = cells
+        .into_iter()
+        .map(|(date, mood)| MoodDay { date, mood })
+        .collect();
     to_js(&MoodMapOut { days, top })
 }

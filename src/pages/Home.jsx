@@ -39,6 +39,8 @@ export default function Home() {
       longest: streaks.longest,
       total: streaks.total,
       missedToday: streaks.missedToday,
+      freezeReady: streaks.freezeReady,
+      frozen: streaks.frozen,
       dueCount: due.length,
     }
   }, [entries, reviews, today.key])
@@ -127,7 +129,12 @@ export default function Home() {
       ) : null}
 
       {/* Streak */}
-      <StreakBadge current={stats.current} missedToday={stats.missedToday} />
+      <StreakBadge
+        current={stats.current}
+        missedToday={stats.missedToday}
+        freezeReady={stats.freezeReady}
+        frozen={stats.frozen}
+      />
 
       {/* Stats */}
       <StatsCards stats={stats} />
