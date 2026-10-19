@@ -1,6 +1,7 @@
 import { Link, Navigate } from 'react-router-dom'
 import AuthForm from '../components/AuthForm'
 import { InkMark } from '../components/Navbar'
+import InstallButton from '../components/InstallButton'
 import ThemeToggle from '../components/ThemeToggle'
 import { useAuth } from '../context/AuthContext'
 
@@ -70,7 +71,10 @@ export default function Login() {
       <main className="flex flex-1 flex-col">
         <div className="flex items-center justify-between px-5 py-5 lg:justify-end">
           <Brand className="lg:hidden" />
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <InstallButton />
+            <ThemeToggle />
+          </div>
         </div>
 
         <div className="flex flex-1 items-center justify-center px-5 pb-12">

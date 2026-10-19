@@ -1,6 +1,34 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
+
+// Fill the service worker's precache list with this build's hashed files.
+function swPrecache() {
+  let assets = []
+  let outDir = 'dist'
+  return {
+    name: 'daily-ink-sw-precache',
+    apply: 'build',
+    configResolved(config) {
+      outDir = config.build.outDir
+    },
+    generateBundle(_, bundle) {
+      assets = Object.keys(bundle)
+        .filter((file) => /\.(js|css|wasm|woff2?)$/.test(file))
+        .map((file) => `/${file}`)
+    },
+    closeBundle() {
+      const swPath = resolve(outDir, 'sw.js')
+      const version = Date.now().toString(36)
+      const source = readFileSync(swPath, 'utf8')
+        .replace("'__BUILD_VERSION__'", JSON.stringify(version))
+        .replace("'__BUILD_ASSETS__'", JSON.stringify(assets))
+      writeFileSync(swPath, source)
+    },
+  }
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -24,7 +52,7 @@ export default defineConfig(({ mode }) => {
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxeGF5dW9lcndidWFhYmVtcmFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzcxMTUsImV4cCI6MjEwNDU1MzExNX0.0qO0M7dDa_IpEziuAS5GXmXKyqoqRJV37dj2qWVZomc'
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), swPrecache()],
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
