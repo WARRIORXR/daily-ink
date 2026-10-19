@@ -19,6 +19,12 @@ import { getEntryKey } from '../utils/formatDate'
 import { parseImport } from '../utils/importData'
 import { DEFAULT_REVIEW_CAP, loadReviewCap, saveReviewCap } from '../utils/spacedRepetition'
 import { isIOS, isStandalone } from '../utils/install'
+import {
+  loadReminder,
+  notificationsSupported,
+  requestNotificationPermission,
+  saveReminder,
+} from '../utils/reminder'
 
 const inputClass =
   'w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-ink outline-none ring-accent/30 placeholder:text-faint focus:ring-4'
@@ -58,6 +64,7 @@ export default function Settings() {
   const [pendingImport, setPendingImport] = useState(null)
   const [importing, setImporting] = useState(false)
   const [reviewCap, setReviewCap] = useState(loadReviewCap)
+  const [reminder, setReminder] = useState(loadReminder)
   const { reviews } = useReviews()
 
   const encryption = useEncryption()
@@ -628,6 +635,73 @@ export default function Settings() {
           />
         </Row>
         <p className="text-xs text-faint">Default {DEFAULT_REVIEW_CAP}. Extra memories wait for the next day.</p>
+      </Section>
+
+      {/* Reminder */}
+      <Section
+        title="Daily reminder"
+        description="Optional. A notification at your chosen time if today's page is still blank. Nothing is sent to a server."
+      >
+        {notificationsSupported() ? (
+          <>
+            <Row
+              label={
+                <label htmlFor="reminder-on" className="text-sm text-ink">
+                  Remind me to write
+                </label>
+              }
+            >
+              <input
+                id="reminder-on"
+                type="checkbox"
+                checked={reminder.enabled}
+                onChange={async (event) => {
+                  const enabled = event.target.checked
+                  if (enabled && !(await requestNotificationPermission())) {
+                    toast(
+                      'Notifications are blocked. Allow them in your browser settings first.',
+                      'error',
+                    )
+                    return
+                  }
+                  const next = { ...reminder, enabled }
+                  setReminder(next)
+                  saveReminder(next)
+                  if (enabled) toast(`Reminder set for ${next.time}`, 'success')
+                }}
+                className="h-6 w-6 accent-[var(--accent)]"
+              />
+            </Row>
+            <Row
+              label={
+                <label htmlFor="reminder-time" className="text-sm text-ink">
+                  Time
+                </label>
+              }
+            >
+              <input
+                id="reminder-time"
+                type="time"
+                value={reminder.time}
+                disabled={!reminder.enabled}
+                onChange={(event) => {
+                  if (!event.target.value) return
+                  const next = { ...reminder, time: event.target.value }
+                  setReminder(next)
+                  saveReminder(next)
+                }}
+                className="min-h-11 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink outline-none ring-accent/30 focus:ring-4 disabled:opacity-50"
+              />
+            </Row>
+          </>
+        ) : (
+          <p className="text-sm text-muted">This browser doesn't support notifications.</p>
+        )}
+        <p className="text-xs text-muted">
+          Reminders only appear while Daily Ink is open in a tab or running as an installed app.
+          On iPhone and iPad they work only after you add Daily Ink to your Home Screen (iOS 16.4
+          or later).
+        </p>
       </Section>
 
       {/* Install */}

@@ -1,17 +1,44 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 
 export default function Modal({ open, onClose, title, children }) {
   const closeRef = useRef(null)
+  const dialogRef = useRef(null)
+  // Kept in a ref so a parent passing a new onClose each render doesn't
+  // re-run the effect below and yank focus back to the close button.
+  const onCloseRef = useRef(onClose)
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose
+  })
 
+  // Escape closes, Tab stays inside the dialog, and focus goes back to
+  // whatever opened it.
   useEffect(() => {
     if (!open) return undefined
+    const opener = document.activeElement
     const onKey = (event) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') onCloseRef.current()
+      if (event.key !== 'Tab' || !dialogRef.current) return
+      const items = dialogRef.current.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!items.length) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', onKey)
     closeRef.current?.focus()
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      opener?.focus?.()
+    }
+  }, [open])
 
   if (!open) return null
 
@@ -23,6 +50,7 @@ export default function Modal({ open, onClose, title, children }) {
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -32,6 +60,7 @@ export default function Modal({ open, onClose, title, children }) {
           <h2 className="font-display text-xl text-ink">{title}</h2>
           <button
             ref={closeRef}
+            type="button"
             onClick={onClose}
             aria-label="Close dialog"
             className="rounded-full p-1.5 text-faint transition hover:bg-surface-2 hover:text-ink"

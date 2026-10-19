@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom'
+import { useDailyReminder } from '../hooks/useDailyReminder'
 import { useEncryptedSample } from '../hooks/useEncryptedSample'
 import { useEncryption } from '../hooks/useEncryption'
 import { useLock } from '../hooks/useLock'
@@ -13,6 +14,7 @@ export default function Layout() {
   // The passphrase screen replaces the page entirely, so nothing encrypted is
   // shown blank and nothing is saved unencrypted while the key is missing.
   const needsPassphrase = enabled ? !unlocked : Boolean(sample)
+  useDailyReminder()
 
   if (needsPassphrase) return <PassphraseLock sample={sample} />
 
