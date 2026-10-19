@@ -206,7 +206,9 @@ export function useEntries() {
 
       try {
         let id = current?.id
-        const payload = { entry_date: dateKey, ...base }
+        // user_id has no column default, and RLS checks auth.uid() = user_id,
+        // so inserts without it are rejected.
+        const payload = { user_id: user.id, entry_date: dateKey, ...base }
         if (id) {
           const { error: updateError } = await supabase
             .from('entries')
@@ -214,9 +216,11 @@ export function useEntries() {
             .eq('id', id)
           if (updateError) throw updateError
         } else {
+          // Upsert on the (user_id, entry_date) key so a row created on another
+          // device (or a racing autosave) is updated instead of failing.
           const { data, error: insertError } = await supabase
             .from('entries')
-            .insert(payload)
+            .upsert(payload, { onConflict: 'user_id,entry_date' })
             .select('id')
             .single()
           if (insertError) throw insertError
@@ -230,32 +234,38 @@ export function useEntries() {
         toast(errorMessage(err, 'Could not save this entry'), 'error')
       }
     },
-    [mode, toast, persistLocal],
+    [mode, user, toast, persistLocal],
   )
 
   const deleteEntry = useCallback(
     async (dateKey) => {
       if (mode !== 'server') {
-        setEntries((cur) => {
-          const next = { ...cur }
-          delete next[dateKey]
-          persistLocal(next, tasksRef.current)
-          return next
-        })
-        setTasks((cur) => {
-          const next = { ...cur }
-          delete next[dateKey]
-          persistLocal(entriesRef.current, next)
-          return next
-        })
-        return
+        // Build both maps up front: persisting from inside each updater would
+        // write the not-yet-updated entries ref back, resurrecting the entry.
+        const nextEntries = { ...entriesRef.current }
+        delete nextEntries[dateKey]
+        const nextTasks = { ...tasksRef.current }
+        delete nextTasks[dateKey]
+        entriesRef.current = nextEntries
+        tasksRef.current = nextTasks
+        persistLocal(nextEntries, nextTasks)
+        setEntries(nextEntries)
+        setTasks(nextTasks)
+        return true
       }
       try {
-        const { error: entriesError } = await supabase
-          .from('entries')
+        const id = entriesRef.current[dateKey]?.id
+        if (id) {
+          const { error: entriesError } = await supabase.from('entries').delete().eq('id', id)
+          if (entriesError) throw entriesError
+        }
+        // Tasks live in their own table; remove them too so they don't come
+        // back on the next load.
+        const { error: tasksError } = await supabase
+          .from('tasks')
           .delete()
-          .eq('id', entriesRef.current[dateKey]?.id)
-        if (entriesError) throw entriesError
+          .eq('entry_date', dateKey)
+        if (tasksError) throw tasksError
         setEntries((cur) => {
           const next = { ...cur }
           delete next[dateKey]
@@ -266,8 +276,10 @@ export function useEntries() {
           delete next[dateKey]
           return next
         })
+        return true
       } catch (err) {
         toast(errorMessage(err, 'Could not delete this entry'), 'error')
+        return false
       }
     },
     [mode, toast, persistLocal],
@@ -306,9 +318,11 @@ export function useEntries() {
         if (rows.length > 0) {
           const { data, error } = await supabase
             .from('tasks')
-            .upsert(rows.map((r) => ({ entry_date: dateKey, ...r })), {
+            .upsert(rows.map((r) => ({ user_id: user.id, entry_date: dateKey, ...r })), {
               onConflict: 'id',
               ignoreDuplicates: false,
+              // Rows without an id get the column default instead of NULL.
+              defaultToNull: false,
             })
             .select('id, title, done, position')
             .order('position')
@@ -330,7 +344,7 @@ export function useEntries() {
         toast(errorMessage(err, 'Could not save tasks'), 'error')
       }
     },
-    [mode, toast, persistLocal],
+    [mode, user, toast, persistLocal],
   )
 
   return { entries, tasks, loading, error, saveEntry, deleteEntry, saveTasks, reload: load }

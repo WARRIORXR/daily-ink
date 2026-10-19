@@ -26,7 +26,8 @@ export function computeStreaks(dateKeys, todayKey = format(new Date(), KEY_FORMA
     if (prev) {
       const diff =
         (parse(key, KEY_FORMAT, new Date()) - parse(prev, KEY_FORMAT, new Date())) / 86_400_000
-      run = diff === 1 ? run + 1 : 1
+      // Round: a daylight-saving change makes a calendar day 23 or 25 hours.
+      run = Math.round(diff) === 1 ? run + 1 : 1
     } else {
       run = 1
     }

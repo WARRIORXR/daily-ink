@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { authProvidersUrl, isSupabaseConfigured, supabase } from '../config/supabaseClient'
-import { hashPassword, verifyPassword } from '../utils/crypto'
 
 const AuthContext = createContext(null)
 const GUEST_KEY = 'daily_ink_guest_mode'
@@ -13,7 +12,7 @@ function friendlyAuthError(message) {
   if (/invalid login credentials|wrong password|password.*invalid/i.test(raw)) {
     return 'Wrong username or password.'
   }
-  if (/user already registered|duplicate key.*username/i.test(raw)) {
+  if (/user already registered|duplicate key.*username|database error saving new user/i.test(raw)) {
     return 'That username is already taken.'
   }
   if (/password should be at least/i.test(raw)) {
@@ -22,7 +21,7 @@ function friendlyAuthError(message) {
   if (/not allowed for this provider|email provider is disabled|signup.*disabled/i.test(raw)) {
     return `Email sign-in is turned off in your Supabase project (one-time setup). Open ${authProvidersUrl} — switch the Email provider ON, uncheck "Confirm email", then Save. You never need to enter an email here.`
   }
-  if (/email not confirmed/i.test(raw)) {
+  if (/email not confirmed|email rate limit/i.test(raw)) {
     return `Accounts use internal sign-in addresses that can't receive email, so confirmation must be off: open ${authProvidersUrl} → Email → uncheck "Confirm email", then sign in again.`
   }
   if (/rate limit/i.test(raw)) {
@@ -92,30 +91,18 @@ export function AuthProvider({ children }) {
         if (active) setLoading(false)
       })
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((event, next) => {
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        setSession(next)
-        setLoading(false)
-      }
-      if (event === 'SIGNED_OUT') {
-        setSession(null)
-        setLoading(false)
-      }
+    // Mirror every auth event (INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED,
+    // USER_UPDATED, SIGNED_OUT). supabase-js already refreshes tokens in the
+    // background and when the tab becomes visible again (autoRefreshToken).
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (!active) return
+      setSession(next ?? null)
+      setLoading(false)
     })
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        supabase.auth.refreshSession().catch(() => {
-          /* handled by onAuthStateChange */
-        })
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
 
     return () => {
       active = false
       subscription?.subscription.unsubscribe()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [])
 
@@ -210,20 +197,9 @@ export function AuthProvider({ children }) {
           return { error: friendlyAuthError(signUpError.message) }
         }
 
-        // Hash password and store in credentials table
-        const passwordHash = await hashPassword(password)
-        const userId = data.user?.id
-        if (userId) {
-          const { error: credError } = await supabase.from('credentials').insert({
-            user_id: userId,
-            username: clean,
-            password_hash: passwordHash,
-          })
-          if (credError) {
-            console.error('Failed to store credentials:', credError)
-            // Don't fail signup — credentials can be added on first sign-in
-          }
-        }
+        // Supabase Auth stores and verifies the password itself, so nothing
+        // else needs saving here. (Earlier versions also wrote a browser-side
+        // hash to public.credentials; sign-in no longer reads it.)
 
         // If signUp returned a session, we're already logged in
         if (data.session) {
@@ -236,7 +212,8 @@ export function AuthProvider({ children }) {
           event: 'sign_up',
           success: true,
         })
-        // No session means "Confirm email" is on — user must sign in after confirming
+        // No session means "Confirm email" is on in Supabase, which blocks
+        // sign-in for the synthetic addresses until it is switched off.
         return { error: null, needsConfirmation: !data.session }
       } catch (err) {
         const msg =
@@ -250,7 +227,8 @@ export function AuthProvider({ children }) {
     [exitGuestMode],
   )
 
-  // Sign in: verify against credentials table, then sign in with Supabase Auth
+  // Sign in: resolve the username to its internal sign-in address, then let
+  // Supabase Auth verify the password.
   const signIn = useCallback(
     async (username, password) => {
       setError(null)
@@ -259,53 +237,8 @@ export function AuthProvider({ children }) {
       }
       const clean = username.trim()
       try {
-        // Look up credentials via the security-definer RPC — the visitor is
-        // still anonymous here, so owner-only RLS would hide the row.
-        const { data: credRows, error: credError } = await supabase.rpc(
-          'get_credential_for_signin',
-          { p_username: clean },
-        )
-        const cred = credRows?.[0] ?? null
-        if (credError) {
-          setError(friendlyAuthError(credError.message))
-          await logLoginEvent({
-            username: clean,
-            event: 'sign_in',
-            success: false,
-            reason: credError.message,
-          })
-          return { error: friendlyAuthError(credError.message) }
-        }
-        if (!cred) {
-          const msg = 'No account found with that username.'
-          setError(msg)
-          await logLoginEvent({
-            username: clean,
-            event: 'sign_in',
-            success: false,
-            reason: 'unknown username',
-          })
-          return { error: msg }
-        }
-
-        // Verify password hash
-        const valid = await verifyPassword(password, cred.password_hash)
-        if (!valid) {
-          const msg = 'Wrong username or password.'
-          setError(msg)
-          await logLoginEvent({
-            username: clean,
-            event: 'sign_in',
-            success: false,
-            reason: 'invalid password',
-          })
-          return { error: msg }
-        }
-
-        // Resolve the synthetic sign-in email saved on the profile at signup.
-        // The timestamp inside the address cannot be reconstructed client-side,
-        // and auth.admin.getUserById needs the service-role key, so we ask the
-        // database through the security-definer RPC (safe while signed out).
+        // The visitor is still anonymous and profiles is owner-only, so the
+        // lookup goes through the security-definer RPC.
         const { data: authEmail, error: emailError } = await supabase.rpc(
           'resolve_login_email',
           { p_username: clean },
@@ -319,7 +252,7 @@ export function AuthProvider({ children }) {
             username: clean,
             event: 'sign_in',
             success: false,
-            reason: emailError?.message ?? 'profile has no sign-in email',
+            reason: emailError?.message ?? 'unknown username',
           })
           return { error: msg }
         }

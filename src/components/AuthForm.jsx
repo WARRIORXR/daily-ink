@@ -162,8 +162,10 @@ export default function AuthForm() {
         if (error) {
           setServerError(error)
         } else if (needsConfirmation) {
-          setNotice(
-            'Account created. Please sign in below.',
+          // Supabase created the account but withheld a session because
+          // "Confirm email" is on; sign-in will keep failing until it's off.
+          setServerError(
+            `Your account was created, but Supabase is still set to require email confirmation, so it can't sign you in yet. Open ${authProvidersUrl} → Email → uncheck "Confirm email", Save, then sign in.`,
           )
           setMode('signin')
           setSubmitted(false)

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import Modal from './Modal'
 import { formatIntervalSummary, PRESET_COLORS, PRESET_ICONS } from '../utils/routines'
+import { getEntryKey } from '../utils/formatDate'
 
 export default function RoutineModal({ open, onClose, routines = [], onAddRoutine, onDeleteRoutine, initialDate }) {
   const [title, setTitle] = useState('')
   const [gapDays, setGapDays] = useState(3)
-  const [startDate, setStartDate] = useState(initialDate || new Date().toISOString().slice(0, 10))
+  const [startDate, setStartDate] = useState(initialDate || getEntryKey())
   const [color, setColor] = useState(PRESET_COLORS[0].hex)
   const [icon, setIcon] = useState('🚿')
   const [adjustFromLast, setAdjustFromLast] = useState(true)

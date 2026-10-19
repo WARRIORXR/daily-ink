@@ -4,7 +4,7 @@ import { useEncryption } from '../hooks/useEncryption'
 import { useEntries } from '../hooks/useEntries'
 import { useEntryContent } from '../hooks/useEntryContent'
 import { useToast } from '../context/ToastContext'
-import { formatEntryDate } from '../utils/formatDate'
+import { formatEntryDate, getEntryKey } from '../utils/formatDate'
 import MoodPicker from './MoodPicker'
 import TaskList from './TaskList'
 
@@ -24,14 +24,21 @@ export default function EntryEditor({ dateKey }) {
   const lastPersisted = useRef({ text: '', mood: null })
   const timerRef = useRef(null)
 
+  // Pull in changes that came from elsewhere (initial load, another device).
+  // Our own save echoing back matches lastPersisted and is skipped, otherwise
+  // anything typed while the save was in flight would be overwritten.
   useEffect(() => {
+    if (plain === lastPersisted.current.text) return
+    lastPersisted.current = { ...lastPersisted.current, text: plain }
     setContent(plain)
   }, [plain])
 
   useEffect(() => {
-    setMood(entry?.mood ?? null)
-    lastPersisted.current = { text: plain, mood: entry?.mood ?? null }
-  }, [dateKey, entry?.mood, plain])
+    const nextMood = entry?.mood ?? null
+    if (nextMood === lastPersisted.current.mood) return
+    lastPersisted.current = { ...lastPersisted.current, mood: nextMood }
+    setMood(nextMood)
+  }, [entry?.mood])
 
   const persist = useCallback(
     async (text, m) => {
@@ -58,12 +65,14 @@ export default function EntryEditor({ dateKey }) {
   async function handleDelete() {
     const confirmed = window.confirm('Delete this entry and its tasks? This cannot be undone.')
     if (!confirmed) return
-    await deleteEntry(dateKey)
+    const ok = await deleteEntry(dateKey)
+    if (!ok) return
     toast('Entry deleted', 'success')
     navigate('/journal')
   }
 
-  const isToday = dateKey === new Date().toISOString().slice(0, 10)
+  // Local calendar day; toISOString() is UTC and is off by a day near midnight.
+  const isToday = dateKey === getEntryKey()
 
   return (
     <div className="space-y-4">

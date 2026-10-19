@@ -9,7 +9,7 @@ Write one page a day, track your streak, and let Daily Ink resurface old entries
 ## Features
 
 ### Core
-- **Auth** - username + password sign-in (no email address needed, no OAuth). Passwords are PBKDF2-hashed in the browser and stored in a `credentials` table; Supabase Auth issues the session behind the scenes using a synthetic internal address
+- **Auth** - username + password sign-in (no email address needed, no OAuth). Usernames are case-insensitive. Supabase Auth stores and verifies the password and issues the session behind the scenes using a synthetic internal address
 - **Admin login log** - admins get an `/admin` page listing every sign-in, sign-up and sign-out attempt with username, time, result and device (never passwords)
 - **Daily entry editor** — autosaving journal page per day, with mood tracking and a task list
 - **Calendar view** — month grid with dots for every written day, plus a day-detail panel
@@ -46,7 +46,7 @@ Try the deployed version at **[daily-ink-three.vercel.app](https://daily-ink-thr
 Without Supabase credentials the app runs in **local mode** — everything stays in the browser. To enable cloud sync:
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `profiles`, `credentials`, `entries`, `tasks`, `reviews`, `routines` and `login_events` tables with RLS policies and signup triggers, plus the security-definer functions the sign-in flow calls while the visitor is still anonymous (`get_credential_for_signin`, `username_available`, `resolve_login_email`), and registers the tables with the Realtime publication (needed for live cross-device sync). The file is safe to re-run - everything is idempotent.
+2. Open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `profiles`, `credentials`, `entries`, `tasks`, `reviews`, `routines` and `login_events` tables with RLS policies and signup triggers, plus the security-definer functions the sign-in flow calls while the visitor is still anonymous (`username_available`, `resolve_login_email`), and registers the tables with the Realtime publication (needed for live cross-device sync). The file is safe to re-run - everything is idempotent.
 3. Copy `.env.example` to `.env.local` and fill in your project URL and anon key (Dashboard → Project Settings → API):
 
 ```
@@ -66,7 +66,7 @@ update public.profiles set is_admin = true where username = 'yourname';
 
 Admins get an **Admin** tab with a login-activity page (`/admin`): every sign-in, sign-up and sign-out attempt with its username, time, device and result.
 
-> **Passwords are never recorded.** Passwords are hashed with PBKDF2-SHA256 (200,000 iterations) in the browser before they reach the `credentials` table, and Supabase hashes them again server-side - no plaintext password ever exists in this project. The login log intentionally stores usernames and timestamps only. The `is_admin` flag can only be set from the SQL editor: a database trigger stops the app from promoting itself, and row level security keeps the log readable by admins alone.
+> **Passwords are never recorded.** Supabase Auth hashes passwords server-side, so no plaintext password ever exists in this project, and no password hash is readable by visitors. (The legacy `credentials` table is no longer used.) The login log intentionally stores usernames and timestamps only. The `is_admin` flag can only be set from the SQL editor: a database trigger stops the app from promoting itself, and row level security keeps the log readable by admins alone.
 
 ### 2. PWA icons (already generated)
 
