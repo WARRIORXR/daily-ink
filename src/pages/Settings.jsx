@@ -13,6 +13,7 @@ import {
   buildMarkdownExport,
   downloadText,
 } from '../utils/exportData'
+import { getEntryKey } from '../utils/formatDate'
 
 const inputClass =
   'w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-ink outline-none ring-accent/30 placeholder:text-faint focus:ring-4'
@@ -134,7 +135,7 @@ export default function Settings() {
     try {
       if (format === 'json') {
         downloadText(
-          `daily-ink-export-${new Date().toISOString().slice(0, 10)}.json`,
+          `daily-ink-export-${getEntryKey()}.json`,
           JSON.stringify(
             buildJSONExport(entries, tasks, reviews),
             null,
@@ -144,7 +145,7 @@ export default function Settings() {
         )
       } else {
         downloadText(
-          `daily-ink-export-${new Date().toISOString().slice(0, 10)}.md`,
+          `daily-ink-export-${getEntryKey()}.md`,
           buildMarkdownExport(entries, tasks),
           'text/markdown',
         )

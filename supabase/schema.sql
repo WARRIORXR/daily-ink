@@ -4,7 +4,7 @@
 --
 -- USERNAME + PASSWORD SIGN-IN NOTES
 --   1. The app never asks for a real email. Accounts are created with a
---      synthetic <username><timestamp>@dailyink.local address, so you MUST
+--      synthetic <username><timestamp>@dailyink.app address, so you MUST
 --      disable "Confirm email": Dashboard → Authentication → Providers →
 --      Email → uncheck "Confirm email". Otherwise sign-in fails with
 --      "Email not confirmed".
@@ -72,23 +72,12 @@ drop policy if exists "credentials_update_own" on public.credentials;
 create policy "credentials_update_own" on public.credentials
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- Sign-in happens while the visitor is still anonymous, so the owner-only
--- policies above would hide every row. This security-definer function is the
--- sanctioned anon read path for credential verification.
-create or replace function public.get_credential_for_signin(p_username text)
-returns table (user_id uuid, password_hash text)
-language sql
-security definer
-stable
-set search_path = public
-as $$
-  select c.user_id, c.password_hash
-  from public.credentials c
-  where c.username = btrim(p_username)
-  limit 1;
-$$;
-
-grant execute on function public.get_credential_for_signin(text) to anon, authenticated;
+-- The app no longer reads this table: Supabase Auth verifies passwords
+-- itself. An earlier revision exposed get_credential_for_signin() to anon,
+-- which let anyone download any user's password hash for offline cracking,
+-- and made sign-in fail with "No account found" for every account whose
+-- credentials row was never written. Remove it on projects that ran it.
+drop function if exists public.get_credential_for_signin(text);
 
 -- One journal entry per day. Content may be client-side encrypted.
 create table if not exists public.entries (
@@ -357,6 +346,9 @@ end $$;
 -- policy is owner-only, and so it bypasses the RLS check for signed-out
 -- visitors. It returns nothing but the synthetic address, and never exposes
 -- any other profile column, so it is safe to expose to anon.
+-- Usernames match case-insensitively ("Maya" signs in as "maya"), and the
+-- lookup falls back to auth.users so accounts whose profile row predates the
+-- username/email columns can still sign in.
 create or replace function public.resolve_login_email(p_username text)
 returns text
 language sql
@@ -364,9 +356,11 @@ security definer
 stable
 set search_path = public
 as $$
-  select p.email
-  from public.profiles p
-  where p.username = btrim(p_username)
+  select coalesce(p.email, u.email)
+  from auth.users u
+  left join public.profiles p on p.id = u.id
+  where lower(coalesce(p.username, u.raw_user_meta_data ->> 'username')) = lower(btrim(p_username))
+  order by u.created_at
   limit 1;
 $$;
 
@@ -401,11 +395,51 @@ stable
 set search_path = public
 as $$
   select not exists (
-    select 1 from public.profiles p where p.username = btrim(p_username)
+    select 1
+    from auth.users u
+    left join public.profiles p on p.id = u.id
+    where lower(coalesce(p.username, u.raw_user_meta_data ->> 'username')) = lower(btrim(p_username))
   );
 $$;
 
 grant execute on function public.username_available(text) to anon, authenticated;
+
+-- Backfill profiles for accounts created before the signup trigger or the
+-- username/email columns existed, so every account can be resolved at sign-in.
+insert into public.profiles (id, username, email, display_name)
+select u.id,
+       u.raw_user_meta_data ->> 'username',
+       u.email,
+       coalesce(u.raw_user_meta_data ->> 'username', split_part(u.email, '@', 1))
+from auth.users u
+where not exists (select 1 from public.profiles p where p.id = u.id)
+on conflict do nothing;
+
+update public.profiles p
+set email = u.email
+from auth.users u
+where p.id = u.id and p.email is null;
+
+update public.profiles p
+set username = u.raw_user_meta_data ->> 'username'
+from auth.users u
+where p.id = u.id
+  and p.username is null
+  and u.raw_user_meta_data ->> 'username' is not null
+  and not exists (
+    select 1 from public.profiles o
+    where lower(o.username) = lower(u.raw_user_meta_data ->> 'username')
+  );
+
+-- Case-insensitive uniqueness, so "Maya" and "maya" can't both register.
+-- Skipped with a notice if existing data already has such duplicates.
+do $$
+begin
+  create unique index if not exists profiles_username_lower_key
+    on public.profiles (lower(username));
+exception when unique_violation then
+  raise notice 'profiles has usernames differing only by case; lower(username) index not created';
+end $$;
 
 -- Refuse to let a normal signed-in user promote themselves. The app can update
 -- its own profile row (theme, display name…), so without this guard anybody
