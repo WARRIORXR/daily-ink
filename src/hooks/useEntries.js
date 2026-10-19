@@ -455,6 +455,7 @@ export function useEntries() {
     deleteEntry,
     saveTasks,
     importData,
+    mode,
     reload: load,
   }
 }
