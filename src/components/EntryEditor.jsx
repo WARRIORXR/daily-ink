@@ -12,7 +12,7 @@ import TaskList from './TaskList'
 export default function EntryEditor({ dateKey }) {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { entries, tasks, saveEntry, deleteEntry, saveTasks } = useEntries()
+  const { entries, tasks, loading, saveEntry, deleteEntry, saveTasks } = useEntries()
   const { encrypt, enabled: encryptionEnabled, unlocked } = useEncryption()
 
   const entry = entries[dateKey]
@@ -27,6 +27,8 @@ export default function EntryEditor({ dateKey }) {
   const lastPersisted = useRef({ text: '', mood: null })
   const timerRef = useRef(null)
   const textareaRef = useRef(null)
+  const draftKey = `daily-ink:draft:${dateKey}`
+  const draftChecked = useRef(false)
 
   // Pull in changes that came from elsewhere (initial load, another device).
   // Our own save echoing back matches lastPersisted and is skipped, otherwise
@@ -48,6 +50,30 @@ export default function EntryEditor({ dateKey }) {
     setMood(nextMood)
   }, [entry?.mood])
 
+  // A page left mid-save (reload, closed tab) can lose the last few words, so
+  // unsaved text is also kept in this tab's sessionStorage until the save
+  // lands. Encrypted journals skip this: no plaintext is stored anywhere.
+  useEffect(() => {
+    if (draftChecked.current || loading || plain !== (entry?.content ?? '')) return
+    draftChecked.current = true
+    let draft = null
+    try {
+      draft = JSON.parse(sessionStorage.getItem(draftKey))
+    } catch {
+      // unreadable draft: ignore it
+    }
+    if (!draft || encryptionEnabled || draft.text === plain) {
+      try {
+        sessionStorage.removeItem(draftKey)
+      } catch {
+        // storage unavailable
+      }
+      return
+    }
+    setContent((current) => (current === plain ? draft.text : current))
+    if (draft.mood !== undefined) setMood(draft.mood)
+  }, [loading, plain, entry?.content, encryptionEnabled, draftKey])
+
   const persist = useCallback(
     async (text, m) => {
       if (text === lastPersisted.current.text && m === lastPersisted.current.mood) return
@@ -64,7 +90,20 @@ export default function EntryEditor({ dateKey }) {
         toast(err.message, 'error')
         return
       }
-      await saveEntry(dateKey, { content: sealed.content, encrypted: sealed.encrypted, mood: m })
+      const ok = await saveEntry(dateKey, {
+        content: sealed.content,
+        encrypted: sealed.encrypted,
+        mood: m,
+      })
+      // Server saves confirm here. A local save finishes in the background, so
+      // its draft is cleared the next time the page opens and matches it.
+      if (ok === true) {
+        try {
+          sessionStorage.removeItem(`daily-ink:draft:${dateKey}`)
+        } catch {
+          // storage unavailable
+        }
+      }
       setStatus('saved')
       window.setTimeout(() => setStatus((s) => (s === 'saved' ? 'idle' : s)), 1400)
     },
@@ -73,17 +112,25 @@ export default function EntryEditor({ dateKey }) {
 
   // Autosave: at most every 3 seconds while writing, and right away when the
   // editor loses focus, the tab is hidden or the page is left.
-  const latest = useRef({ content, mood, persist })
+  const latest = useRef({ content, mood, persist, encryptionEnabled })
   useLayoutEffect(() => {
-    latest.current = { content, mood, persist }
+    latest.current = { content, mood, persist, encryptionEnabled }
   })
 
   const flush = useCallback(() => {
     window.clearTimeout(timerRef.current)
     timerRef.current = null
-    const { content: text, mood: m, persist: save } = latest.current
+    const { content: text, mood: m, persist: save, encryptionEnabled: sealed } = latest.current
+    const dirty = text !== lastPersisted.current.text || m !== lastPersisted.current.mood
+    if (dirty && !sealed) {
+      try {
+        sessionStorage.setItem(draftKey, JSON.stringify({ text, mood: m }))
+      } catch {
+        // storage full or unavailable: the normal save still runs
+      }
+    }
     save(text, m)
-  }, [])
+  }, [draftKey])
 
   useEffect(() => {
     const dirty = content !== lastPersisted.current.text || mood !== lastPersisted.current.mood

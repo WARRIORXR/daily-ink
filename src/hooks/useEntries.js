@@ -268,8 +268,10 @@ export function useEntries() {
           ...cur,
           [dateKey]: { ...(cur[dateKey] ?? {}), id, ...base, updatedAt },
         }))
+        return true
       } catch (err) {
         toast(errorMessage(err, 'Could not save this entry'), 'error')
+        return false
       }
     },
     [mode, user, toast, persistLocal],
