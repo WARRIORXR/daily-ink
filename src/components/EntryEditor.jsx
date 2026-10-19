@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useEncryption } from '../hooks/useEncryption'
 import { useEntries } from '../hooks/useEntries'
@@ -26,14 +26,19 @@ export default function EntryEditor({ dateKey }) {
   const [wordGoal, setWordGoal] = useState(loadWordGoal)
   const lastPersisted = useRef({ text: '', mood: null })
   const timerRef = useRef(null)
+  const textareaRef = useRef(null)
 
   // Pull in changes that came from elsewhere (initial load, another device).
   // Our own save echoing back matches lastPersisted and is skipped, otherwise
   // anything typed while the save was in flight would be overwritten.
   useEffect(() => {
     if (plain === lastPersisted.current.text) return
+    const saved = lastPersisted.current.text
     lastPersisted.current = { ...lastPersisted.current, text: plain }
-    setContent(plain)
+    // Words typed before the saved page finished loading are kept, after it.
+    setContent((current) =>
+      current && current !== saved && current !== plain && plain ? `${plain}\n\n${current}` : plain,
+    )
   }, [plain])
 
   useEffect(() => {
@@ -66,14 +71,38 @@ export default function EntryEditor({ dateKey }) {
     [dateKey, encrypt, saveEntry, toast],
   )
 
-  // Debounced autosave on typing.
-  useEffect(() => {
+  // Autosave: at most every 3 seconds while writing, and right away when the
+  // editor loses focus, the tab is hidden or the page is left.
+  const latest = useRef({ content, mood, persist })
+  useLayoutEffect(() => {
+    latest.current = { content, mood, persist }
+  })
+
+  const flush = useCallback(() => {
     window.clearTimeout(timerRef.current)
-    timerRef.current = window.setTimeout(() => {
-      persist(content, mood)
-    }, 900)
-    return () => window.clearTimeout(timerRef.current)
-  }, [content, mood, persist])
+    timerRef.current = null
+    const { content: text, mood: m, persist: save } = latest.current
+    save(text, m)
+  }, [])
+
+  useEffect(() => {
+    const dirty = content !== lastPersisted.current.text || mood !== lastPersisted.current.mood
+    if (!dirty || timerRef.current) return
+    timerRef.current = window.setTimeout(flush, 3000)
+  }, [content, mood, flush])
+
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', flush)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
+  }, [flush])
 
   async function handleDelete() {
     const confirmed = window.confirm('Delete this entry and its tasks? This cannot be undone.')
@@ -86,6 +115,15 @@ export default function EntryEditor({ dateKey }) {
 
   // Local calendar day; toISOString() is UTC and is off by a day near midnight.
   const isToday = dateKey === getEntryKey()
+
+  // Today's page opens ready to type, cursor at the end of anything written.
+  useEffect(() => {
+    if (!isToday) return
+    const el = textareaRef.current
+    if (!el || document.activeElement === el) return
+    el.focus({ preventScroll: true })
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [isToday, plain])
   const prompt = getPrompt(dateKey, promptOffset)
   const { words, minutes } = useMemo(() => getWordStats(content), [content])
   const goalProgress = wordGoal ? Math.min(words / wordGoal, 1) : 0
@@ -175,9 +213,11 @@ export default function EntryEditor({ dateKey }) {
           <span className="ml-2 font-hand text-sm text-faint">dear diary…</span>
         </div>
         <textarea
+          ref={textareaRef}
           id="entry-content"
           value={content}
           onChange={(event) => setContent(event.target.value)}
+          onBlur={flush}
           placeholder={
             isToday
               ? 'What stayed with you today?'

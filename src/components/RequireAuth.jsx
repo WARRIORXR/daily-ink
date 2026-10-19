@@ -7,7 +7,7 @@ export default function RequireAuth({ children }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-bg">
+      <div className="mx-auto flex min-h-svh max-w-4xl justify-center bg-bg px-4 pt-24">
         <Spinner label="Warming up…" />
       </div>
     )

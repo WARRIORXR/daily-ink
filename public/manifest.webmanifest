@@ -3,7 +3,7 @@
   "short_name": "Daily Ink",
   "description": "A private daily journal with streaks, on-this-day memories, and spaced-repetition reviews.",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/journal",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
