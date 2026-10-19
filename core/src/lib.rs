@@ -69,10 +69,11 @@ struct ScheduleOut {
 pub fn next_review(
     repetitions: u32,
     ease_factor: f64,
+    interval_days: i32,
     grade: u8,
     today: &str,
 ) -> Result<JsValue, JsValue> {
-    let s = logic::next_review(repetitions, ease_factor, grade, today);
+    let s = logic::next_review(repetitions, ease_factor, interval_days.into(), grade, today);
     to_js(&ScheduleOut {
         repetitions: s.repetitions,
         ease_factor: s.ease_factor,

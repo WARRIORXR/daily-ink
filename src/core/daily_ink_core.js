@@ -209,14 +209,15 @@ export function heatmap(levels, frozen, today, weeks) {
 /**
  * @param {number} repetitions
  * @param {number} ease_factor
+ * @param {number} interval_days
  * @param {number} grade
  * @param {string} today
  * @returns {any}
  */
-export function nextReview(repetitions, ease_factor, grade, today) {
+export function nextReview(repetitions, ease_factor, interval_days, grade, today) {
     const ptr0 = passStringToWasm0(today, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.nextReview(repetitions, ease_factor, grade, ptr0, len0);
+    const ret = wasm.nextReview(repetitions, ease_factor, interval_days, grade, ptr0, len0);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }

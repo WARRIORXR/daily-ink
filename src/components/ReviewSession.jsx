@@ -9,30 +9,34 @@ const GRADES = [
   {
     key: 0,
     label: 'Again',
-    hint: '1 day',
     className: 'border-danger/40 text-danger hover:bg-danger/10 hover:border-danger/60',
   },
   {
     key: 1,
     label: 'Hard',
-    hint: '3 days',
     className: 'border-accent/40 text-accent hover:bg-accent-soft hover:border-accent/60',
   },
   {
     key: 2,
     label: 'Good',
-    hint: '7 days',
     className: 'border-success/40 text-success hover:bg-success/10 hover:border-success/60',
   },
   {
     key: 3,
     label: 'Easy',
-    hint: '14 days',
     className: 'border-border text-ink hover:bg-surface-2 hover:border-faint',
   },
 ]
 
-export default function ReviewSession({ dateKey, entry, otherKeys, index, total, onGrade }) {
+export default function ReviewSession({
+  dateKey,
+  entry,
+  otherKeys,
+  index,
+  total,
+  onGrade,
+  previews = {},
+}) {
   const [phase, setPhase] = useState('quiz') // quiz | entry
   const text = useEntryContent(entry)
   const quiz = useMemo(
@@ -117,7 +121,7 @@ export default function ReviewSession({ dateKey, entry, otherKeys, index, total,
                     className={`rounded-xl border bg-surface px-3 py-3 shadow-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 ${grade.className}`}
                   >
                     <span className="block font-display font-medium">{grade.label}</span>
-                    <span className="block text-xs opacity-70">{grade.hint}</span>
+                    <span className="block text-xs opacity-70">{previews[grade.key]}</span>
                   </button>
                 ))}
               </div>
