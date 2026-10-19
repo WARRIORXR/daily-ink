@@ -12,6 +12,7 @@ export {
   dueQueue,
   heatmap,
   intervalSummary,
+  memories,
   moodMap,
   nextReview,
   nextRoutineDate,

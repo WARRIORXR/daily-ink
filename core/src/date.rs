@@ -52,6 +52,17 @@ pub fn add_days(key: &str, amount: i64) -> Option<String> {
     parse_key(key).map(|d| format_key(d + amount))
 }
 
+/// Same day `months` months earlier or later, clamped to the end of a shorter
+/// month (31 March minus one month is 28 or 29 February).
+pub fn add_months(key: &str, months: i64) -> Option<String> {
+    let day = parse_key(key)?;
+    let (y, m, d) = civil_from_days(day);
+    let total = y * 12 + (m as i64 - 1) + months;
+    let (ny, nm) = (total.div_euclid(12), (total.rem_euclid(12) + 1) as u32);
+    let nd = d.min(days_in_month(ny, nm));
+    Some(format_key(days_from_civil(ny, nm, nd)))
+}
+
 fn days_in_month(y: i64, m: u32) -> u32 {
     match m {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
@@ -75,6 +86,15 @@ mod tests {
         for day in -1000..30_000 {
             assert_eq!(parse_key(&format_key(day)), Some(day));
         }
+    }
+
+    #[test]
+    fn adds_months_with_clamping() {
+        assert_eq!(add_months("2026-10-19", -1).as_deref(), Some("2026-09-19"));
+        assert_eq!(add_months("2026-03-31", -1).as_deref(), Some("2026-02-28"));
+        assert_eq!(add_months("2024-03-31", -1).as_deref(), Some("2024-02-29"));
+        assert_eq!(add_months("2026-01-15", -6).as_deref(), Some("2025-07-15"));
+        assert_eq!(add_months("2026-10-19", -12).as_deref(), Some("2025-10-19"));
     }
 
     #[test]
