@@ -4,7 +4,7 @@ import PageHeader from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useToast } from '../context/ToastContext'
-import { useEncryption } from '../hooks/useEncryption'
+import { openWithCurrentKey, sealWithCurrentKey, useEncryption } from '../hooks/useEncryption'
 import { useEntries } from '../hooks/useEntries'
 import { useLock } from '../hooks/useLock'
 import { useReviews } from '../hooks/useReviews'
@@ -51,7 +51,7 @@ export default function Settings() {
   const { user, username, signOut } = useAuth()
   const { theme, setMode } = useTheme()
   const { toast } = useToast()
-  const { entries, tasks, importData } = useEntries()
+  const { entries, tasks, importData, saveEntry, mode: storageMode } = useEntries()
   const [pendingImport, setPendingImport] = useState(null)
   const [importing, setImporting] = useState(false)
   const { reviews } = useReviews()
@@ -82,9 +82,56 @@ export default function Settings() {
       await encryption.enable(passphrase)
       setPassphrase('')
       setConfirmPass('')
-      toast('Encryption enabled — new entries are encrypted', 'success')
+      const count = await resealEntries(true)
+      toast(
+        count
+          ? `Encryption on. ${count} existing ${count === 1 ? 'entry' : 'entries'} encrypted.`
+          : 'Encryption on. New entries are encrypted.',
+        'success',
+      )
     } catch (err) {
       toast(err?.message ?? 'Could not enable encryption', 'error')
+    } finally {
+      setEncBusy(false)
+    }
+  }
+
+  // Re-save every entry encrypted (on) or as plain text (off). Runs one entry
+  // at a time so a failure part-way leaves each entry readable either way.
+  async function resealEntries(toEncrypted) {
+    let count = 0
+    for (const [date, entry] of Object.entries(entries)) {
+      if (Boolean(entry.encrypted) === toEncrypted || !entry.content) continue
+      if (toEncrypted) {
+        const sealed = await sealWithCurrentKey(entry.content)
+        await saveEntry(date, { content: sealed.content, encrypted: true })
+      } else {
+        const plain = await openWithCurrentKey(entry.content)
+        await saveEntry(date, { content: plain, encrypted: false })
+      }
+      count++
+    }
+    return count
+  }
+
+  async function handleDisableEncryption() {
+    if (
+      !window.confirm(
+        'Turn off encryption? Your entries will be decrypted on this device and saved as plain text.',
+      )
+    ) {
+      return
+    }
+    setEncBusy(true)
+    try {
+      const count = await resealEntries(false)
+      encryption.disable()
+      toast(
+        `Encryption off. ${count} ${count === 1 ? 'entry' : 'entries'} saved as plain text.`,
+        'success',
+      )
+    } catch (err) {
+      toast(err?.message ?? 'Could not turn off encryption', 'error')
     } finally {
       setEncBusy(false)
     }
@@ -187,7 +234,19 @@ export default function Settings() {
       return
     }
     setImporting(true)
-    const ok = await importData(pendingImport, strategy)
+    let data = pendingImport
+    if (encryption.enabled) {
+      // Keep the journal fully encrypted: seal plain-text entries from the file first.
+      const sealedEntries = {}
+      for (const [date, entry] of Object.entries(data.entries)) {
+        sealedEntries[date] =
+          entry.encrypted || !entry.content
+            ? entry
+            : { ...entry, ...(await sealWithCurrentKey(entry.content)) }
+      }
+      data = { ...data, entries: sealedEntries }
+    }
+    const ok = await importData(data, strategy)
     setImporting(false)
     if (!ok) return
     setPendingImport(null)
@@ -285,7 +344,7 @@ export default function Settings() {
       {/* Encryption */}
       <Section
         title="Encryption"
-        description="Encrypt entries with a passphrase before they leave this device. The passphrase is never stored — if you lose it, encrypted entries can't be recovered."
+        description="Encrypt every entry with a passphrase (AES-256, key derived with PBKDF2) before it leaves this device. Turning it on also asks for the passphrase each time the app opens and after 5 minutes in the background."
       >
         {!encryption.enabled ? (
           <form onSubmit={handleEnableEncryption} className="space-y-3">
@@ -328,7 +387,8 @@ export default function Settings() {
               </div>
             </div>
             <p className="text-xs text-faint">
-              At least 8 characters. Don't lose it — there's no recovery.
+              At least 8 characters. It is never stored or sent anywhere, so if you lose it your
+              encrypted entries cannot be recovered by anyone, including us.
             </p>
             <button
               type="submit"
@@ -341,7 +401,7 @@ export default function Settings() {
         ) : encryption.unlocked ? (
           <div className="space-y-3">
             <p className="text-sm text-success">
-              🔒 Encryption is on and unlocked this session.
+              🔒 Encryption is on. Entries are encrypted on this device before they are saved or synced.
             </p>
             <Row
               label={
@@ -366,23 +426,15 @@ export default function Settings() {
                 <div className="space-y-0.5">
                   <p className="text-sm text-ink">Turn off encryption</p>
                   <p className="text-xs text-faint">
-                    Existing encrypted entries stay encrypted.
+                    Decrypts every entry and saves it as plain text.
                   </p>
                 </div>
               }
             >
               <button
                 type="button"
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      'Disable encryption? Existing encrypted entries remain encrypted.',
-                    )
-                  ) {
-                    encryption.disable()
-                    toast('Encryption disabled', 'success')
-                  }
-                }}
+                disabled={encBusy}
+                onClick={handleDisableEncryption}
                 className="rounded-full border border-danger/40 px-4 py-2 text-sm text-danger transition hover:bg-danger/10"
               >
                 Disable
@@ -542,6 +594,34 @@ export default function Settings() {
         )}
       </Section>
 
+      {/* Where data lives */}
+      <Section title="Where your data is stored">
+        <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted">
+          {storageMode === 'server' ? (
+            <li>
+              Entries, tasks and reviews are saved to your Daily Ink account (Supabase) so they
+              sync between your devices. Only you can read them: each row is tied to your account.
+            </li>
+          ) : (
+            <li>
+              Entries and tasks are saved only in this browser (IndexedDB). Clearing site data
+              deletes them, so export a backup regularly.
+            </li>
+          )}
+          <li>
+            {encryption.enabled
+              ? 'Encryption is on: entry text is encrypted on this device first, so the server only ever stores unreadable text. Moods, dates and tasks are not encrypted.'
+              : 'Encryption is off: entry text is stored as plain text. Turn it on above to encrypt it on this device first.'}
+          </li>
+          <li>
+            Your passphrase and app-lock PIN never leave this device. If the passphrase is lost,
+            encrypted entries cannot be recovered.
+          </li>
+          <li>Settings such as theme, word goal and lock live in this browser only.</li>
+          <li>No analytics or tracking.</li>
+        </ul>
+      </Section>
+
       {/* Data export */}
       <Section
         title="Your Data"
@@ -628,8 +708,8 @@ export default function Settings() {
       </Section>
 
       <p className="text-center text-xs text-faint">
-        Daily Ink · entries sync via Supabase with row-level security ·{' '}
-        optional AES-256 client-side encryption
+        Daily Ink · entries sync via Supabase with row-level security · optional AES-256
+        encryption on your device
       </p>
     </div>
   )

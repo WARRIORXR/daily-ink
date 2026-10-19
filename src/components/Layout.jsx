@@ -1,10 +1,20 @@
 import { Outlet } from 'react-router-dom'
+import { useEncryptedSample } from '../hooks/useEncryptedSample'
+import { useEncryption } from '../hooks/useEncryption'
 import { useLock } from '../hooks/useLock'
 import LockScreen from './LockScreen'
 import Navbar from './Navbar'
+import PassphraseLock from './PassphraseLock'
 
 export default function Layout() {
   const { locked } = useLock()
+  const { enabled, unlocked } = useEncryption()
+  const sample = useEncryptedSample(enabled)
+  // The passphrase screen replaces the page entirely, so nothing encrypted is
+  // shown blank and nothing is saved unencrypted while the key is missing.
+  const needsPassphrase = enabled ? !unlocked : Boolean(sample)
+
+  if (needsPassphrase) return <PassphraseLock sample={sample} />
 
   return (
     <div className="flex min-h-svh flex-col bg-bg text-ink">

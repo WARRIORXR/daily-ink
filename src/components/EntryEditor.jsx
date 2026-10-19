@@ -46,14 +46,24 @@ export default function EntryEditor({ dateKey }) {
   const persist = useCallback(
     async (text, m) => {
       if (text === lastPersisted.current.text && m === lastPersisted.current.mood) return
+      const previous = lastPersisted.current
       lastPersisted.current = { text, mood: m }
       setStatus('saving')
-      const { content: stored, encrypted } = await encrypt(text)
-      await saveEntry(dateKey, { content: stored, encrypted, mood: m })
+      let sealed
+      try {
+        sealed = await encrypt(text)
+      } catch (err) {
+        // Locked mid-edit: keep the text on screen and retry once unlocked.
+        lastPersisted.current = previous
+        setStatus('idle')
+        toast(err.message, 'error')
+        return
+      }
+      await saveEntry(dateKey, { content: sealed.content, encrypted: sealed.encrypted, mood: m })
       setStatus('saved')
       window.setTimeout(() => setStatus((s) => (s === 'saved' ? 'idle' : s)), 1400)
     },
-    [dateKey, encrypt, saveEntry],
+    [dateKey, encrypt, saveEntry, toast],
   )
 
   // Debounced autosave on typing.

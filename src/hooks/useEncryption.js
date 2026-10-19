@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
+import { useAuth } from '../context/AuthContext'
 import {
   decryptContent,
+  decryptText,
   deriveKey,
   encryptContent,
   encryptText,
-  exportKeyToBase64,
   fromB64,
-  importKeyFromBase64,
+  isEncrypted,
   toB64,
 } from '../utils/crypto'
 
 const CONFIG_KEY = 'daily-ink:encryption'
-const SESSION_KEY = 'daily-ink:encryption-key'
+const LEGACY_SESSION_KEY = 'daily-ink:encryption-key'
 const VERIFY_TEXT = 'daily-ink-verify'
 
 function readConfig() {
@@ -28,97 +29,146 @@ function readConfig() {
   }
 }
 
-function readSessionKey() {
-  return sessionStorage.getItem(SESSION_KEY)
+// Older versions kept the raw key in sessionStorage; the key now lives only in
+// memory, so every reload and every auto-lock asks for the passphrase again.
+try {
+  sessionStorage.removeItem(LEGACY_SESSION_KEY)
+} catch {
+  // Storage blocked: nothing to clean up.
+}
+
+// Shared store: Layout, the editor, Settings and every entry view each call
+// useEncryption, and unlocking in one place must unlock all of them.
+let store = { config: readConfig(), key: null }
+const listeners = new Set()
+
+function setStore(patch) {
+  store = { ...store, ...patch }
+  for (const listener of listeners) listener()
+}
+
+function subscribe(listener) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+const getStore = () => store
+
+/** Encrypt with the current key, for bulk jobs that run right after unlocking. */
+export async function sealWithCurrentKey(text) {
+  if (!store.key) throw new Error('Your journal is locked. Unlock it first.')
+  return encryptContent(text, store.key)
+}
+
+/** Decrypt with the current key; throws if locked or the text can't be read. */
+export async function openWithCurrentKey(content) {
+  if (!isEncrypted(content)) return content
+  if (!store.key) throw new Error('Your journal is locked. Unlock it first.')
+  const [, , iv, data] = content.split(':')
+  return decryptText({ iv, data }, store.key)
+}
+
+/** Forget the key (used by auto-lock). Encrypted entries become unreadable until unlocked. */
+export function lockEncryption() {
+  if (store.key) setStore({ key: null })
+}
+
+// Signed-in accounts derive the salt from the user id, so the same passphrase
+// gives the same key on every device and synced entries open anywhere.
+async function saltFor(userId) {
+  if (!userId) return crypto.getRandomValues(new Uint8Array(16))
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`daily-ink:${userId}`),
+  )
+  return new Uint8Array(digest).slice(0, 16)
+}
+
+async function saveConfig(salt, key) {
+  const { iv, data } = await encryptText(VERIFY_TEXT, key)
+  const config = { enabled: true, salt: toB64(salt), verifier: { iv, data } }
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(config))
+  setStore({ config, key })
 }
 
 export function useEncryption() {
-  const [config, setConfig] = useState(readConfig)
-  const [unlocked, setUnlocked] = useState(Boolean(readSessionKey()))
+  const { user } = useAuth()
+  const userId = user?.id
+  const state = useSyncExternalStore(subscribe, getStore)
 
-  useEffect(() => {
-    setConfig(readConfig())
-    setUnlocked(Boolean(readSessionKey()))
-  }, [])
-
-  const getKey = useCallback(async () => {
-    const raw = readSessionKey()
-    if (!raw) return null
-    return importKeyFromBase64(raw)
-  }, [])
-
-  const enable = useCallback(async (passphrase) => {
-    const salt = crypto.getRandomValues(new Uint8Array(16))
-    const key = await deriveKey(passphrase, salt)
-    const { iv, data } = await encryptText(VERIFY_TEXT, key)
-    const stored = {
-      enabled: true,
-      salt: toB64(salt),
-      verifier: { iv, data },
-    }
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(stored))
-    sessionStorage.setItem(SESSION_KEY, await exportKeyToBase64(key))
-    setConfig(stored)
-    setUnlocked(true)
-  }, [])
-
-  const unlock = useCallback(
+  const enable = useCallback(
     async (passphrase) => {
-      const stored = readConfig()
-      if (!stored?.enabled) return false
-      const key = await deriveKey(passphrase, fromB64(stored.salt))
-      const plain = await decryptContent(
-        `enc:v1:${stored.verifier.iv}:${stored.verifier.data}`,
-        key,
-      )
-      if (plain !== VERIFY_TEXT) return false
-      sessionStorage.setItem(SESSION_KEY, await exportKeyToBase64(key))
-      setUnlocked(true)
-      return true
+      const salt = await saltFor(userId)
+      await saveConfig(salt, await deriveKey(passphrase, salt))
     },
-    [],
+    [userId],
   )
 
-  const lock = useCallback(() => {
-    sessionStorage.removeItem(SESSION_KEY)
-    setUnlocked(false)
-  }, [])
+  /**
+   * Unlock with the passphrase. On a device that has never unlocked before,
+   * `sample` (any encrypted entry content from the account) proves the
+   * passphrase is right before this device is set up.
+   */
+  const unlock = useCallback(
+    async (passphrase, sample) => {
+      const config = readConfig()
+      if (config) {
+        const key = await deriveKey(passphrase, fromB64(config.salt))
+        const plain = await decryptContent(
+          `enc:v1:${config.verifier.iv}:${config.verifier.data}`,
+          key,
+        )
+        if (plain !== VERIFY_TEXT) return false
+        setStore({ config, key })
+        return true
+      }
+      if (!isEncrypted(sample) || !userId) return false
+      const salt = await saltFor(userId)
+      const key = await deriveKey(passphrase, salt)
+      const probe = sample.split(':')
+      try {
+        await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: fromB64(probe[2]) },
+          key,
+          fromB64(probe[3]),
+        )
+      } catch {
+        return false
+      }
+      await saveConfig(salt, key)
+      return true
+    },
+    [userId],
+  )
+
+  const lock = useCallback(() => lockEncryption(), [])
 
   const disable = useCallback(() => {
     localStorage.removeItem(CONFIG_KEY)
-    sessionStorage.removeItem(SESSION_KEY)
-    setConfig(null)
-    setUnlocked(false)
+    setStore({ config: null, key: null })
   }, [])
+
+  const enabled = state.config?.enabled ?? false
+  const key = state.key
 
   const encrypt = useCallback(
     async (text) => {
-      if (!config?.enabled || !unlocked) return { content: text, encrypted: false }
-      const key = await getKey()
-      if (!key) return { content: text, encrypted: false }
+      if (!enabled) return { content: text, encrypted: false }
+      // Saving plaintext while locked would silently undo the encryption.
+      if (!key) throw new Error('Your journal is locked. Unlock it to save.')
       return encryptContent(text, key)
     },
-    [config?.enabled, unlocked, getKey],
+    [enabled, key],
   )
 
   const decrypt = useCallback(
     async (content) => {
-      if (typeof content !== 'string' || !content.startsWith('enc:v1:')) return content
-      const key = await getKey()
+      if (!isEncrypted(content)) return content
       if (!key) return ''
       return decryptContent(content, key)
     },
-    [getKey],
+    [key],
   )
 
-  return {
-    enabled: config?.enabled ?? false,
-    unlocked,
-    enable,
-    unlock,
-    lock,
-    disable,
-    encrypt,
-    decrypt,
-  }
+  return { enabled, unlocked: Boolean(key), enable, unlock, lock, disable, encrypt, decrypt }
 }

@@ -29,7 +29,7 @@ async function deriveKey(passphrase, salt) {
     { name: 'PBKDF2', salt, iterations: 150_000, hash: 'SHA-256' },
     base,
     { name: 'AES-GCM', length: 256 },
-    true, // extractable so the session key can persist across reloads
+    false, // the key only ever lives in memory; locking forgets it
     ['encrypt', 'decrypt'],
   )
 }
