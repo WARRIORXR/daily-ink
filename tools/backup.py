@@ -16,6 +16,7 @@ Entries encrypted in the app stay encrypted in the backup.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import getpass
 import json
 import os
@@ -60,6 +61,11 @@ def load_settings(root: Path = ROOT) -> tuple[str, str]:
     return url.rstrip("/"), key
 
 
+def auth_email_for(username: str) -> str:
+    digest = hashlib.sha256(username.strip().lower().encode("utf-8")).hexdigest()
+    return f"u-{digest[:40]}@users.dailyink.app"
+
+
 class Supabase:
     def __init__(self, url: str, anon_key: str):
         self.url = url
@@ -86,12 +92,15 @@ class Supabase:
             raise SystemExit(f"Supabase error ({err.code}): {message or err.reason}") from None
 
     def sign_in(self, username: str, password: str) -> None:
-        email = self._request("POST", "/rest/v1/rpc/resolve_login_email", {"p_username": username})
-        if not email:
-            raise SystemExit("No account found with that username.")
-        session = self._request(
-            "POST", "/auth/v1/token?grant_type=password", {"email": email, "password": password}
-        )
+        # Same derived address as the app (src/utils/authEmail.js), so no
+        # lookup is needed and none is exposed to strangers.
+        email = auth_email_for(username)
+        try:
+            session = self._request(
+                "POST", "/auth/v1/token?grant_type=password", {"email": email, "password": password}
+            )
+        except SystemExit:
+            raise SystemExit("Wrong username or password.") from None
         self.token = session["access_token"]
 
     def fetch(self, table: str) -> list[dict]:

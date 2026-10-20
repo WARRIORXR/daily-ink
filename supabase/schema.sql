@@ -8,15 +8,15 @@
 --      disable "Confirm email": Dashboard → Authentication → Providers →
 --      Email → uncheck "Confirm email". Otherwise sign-in fails with
 --      "Email not confirmed".
---   2. Profiles store the username (unique) and the synthetic email (unique)
---      so sign-in can resolve username → email before authenticating.
---   3. Signed-out visitors resolve a username to its sign-in email through the
---      public.resolve_login_email() function below, NOT by reading profiles.
---      profiles itself stays readable by its owner only.
---   4. Every sign-in attempt is appended to public.login_events. The log stores
---      the username, time, result and device — never the password (Supabase
---      hashes passwords server-side, so no plaintext password ever exists in
---      this project). Only admins can read it.
+--   2. The sign-in email is derived from the username in the browser (see
+--      auth_email_for() below), so signed-out visitors never query anything
+--      and cannot test whether a username exists. profiles stays owner-only.
+--   3. Every sign-in, sign-up and sign-out is recorded in public.login_events
+--      through log_auth_event(). The log stores the username, user id, time,
+--      result, failure reason and browser — never the password (Supabase
+--      hashes passwords server-side). Only admins can read it.
+--   4. Recommended Auth settings: minimum password length 8, CAPTCHA
+--      protection (Turnstile) on, and the default rate limits left on.
 --   5. To make yourself an admin, run this once with your own username:
 --        update public.profiles set is_admin = true where username = 'yourname';
 --      You may need to sign up in the app first. The is_admin flag cannot be
@@ -46,38 +46,11 @@ alter table public.profiles add column if not exists username text unique;
 alter table public.profiles add column if not exists email    text unique;
 alter table public.profiles add column if not exists is_admin boolean not null default false;
 
--- Credentials table for pure username/password auth (no email).
--- Stores password hashes only; never stores plaintext passwords.
-create table if not exists public.credentials (
-  user_id       uuid primary key references auth.users (id) on delete cascade,
-  username      text unique not null,
-  password_hash text not null,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
-);
-
-alter table public.credentials enable row level security;
-
--- Only the credential owner can read their own row (for verification).
--- Service role bypasses RLS for admin operations.
-drop policy if exists "credentials_select_own" on public.credentials;
-create policy "credentials_select_own" on public.credentials
-  for select using (auth.uid() = user_id);
-
-drop policy if exists "credentials_insert_own" on public.credentials;
-create policy "credentials_insert_own" on public.credentials
-  for insert with check (auth.uid() = user_id);
-
-drop policy if exists "credentials_update_own" on public.credentials;
-create policy "credentials_update_own" on public.credentials
-  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
--- The app no longer reads this table: Supabase Auth verifies passwords
--- itself. An earlier revision exposed get_credential_for_signin() to anon,
--- which let anyone download any user's password hash for offline cracking,
--- and made sign-in fail with "No account found" for every account whose
--- credentials row was never written. Remove it on projects that ran it.
+-- Passwords live only in Supabase Auth (bcrypt, server-side). Early versions
+-- also kept a browser-made hash in public.credentials and exposed
+-- get_credential_for_signin() to anon; both are removed here.
 drop function if exists public.get_credential_for_signin(text);
+drop table if exists public.credentials;
 
 -- One journal entry per day. Content may be client-side encrypted.
 create table if not exists public.entries (
@@ -134,10 +107,8 @@ alter table public.tasks    enable row level security;
 alter table public.reviews  enable row level security;
 
 -- Profiles: readable by the owner only. Signed-out visitors never need to
--- read this table — they resolve username -> sign-in email through
--- public.resolve_login_email(), a security-definer function defined further
--- down. (An older revision of this file allowed public SELECT; the drop below
--- removes that policy on projects that already ran it.)
+-- read this table. (An older revision of this file allowed public SELECT; the
+-- drop below removes that policy on projects that already ran it.)
 drop policy if exists "profiles_select_for_signin" on public.profiles;
 
 drop policy if exists "profiles_select_own" on public.profiles;
@@ -341,30 +312,56 @@ end $$;
 -- Admin & login activity
 -- ============================================================================
 
--- Concurrency-safe lookup of a username's sign-in email.
--- SECURITY DEFINER so it can read profiles even though the profiles SELECT
--- policy is owner-only, and so it bypasses the RLS check for signed-out
--- visitors. It returns nothing but the synthetic address, and never exposes
--- any other profile column, so it is safe to expose to anon.
--- Usernames match case-insensitively ("Maya" signs in as "maya"), and the
--- lookup falls back to auth.users so accounts whose profile row predates the
--- username/email columns can still sign in.
-create or replace function public.resolve_login_email(p_username text)
+-- Sign-in addresses are derived from the username in the browser
+-- (src/utils/authEmail.js): 'u-' + first 40 hex chars of sha256(lower(trim(
+-- username))) + '@users.dailyink.app'. Signing in therefore needs no lookup,
+-- and the lookup functions that let anyone test whether a username exists
+-- are dropped. Older accounts used '<name><timestamp>@dailyink.app'; the block
+-- below moves them to the new address. Passwords are untouched, and running
+-- it again changes nothing.
+create extension if not exists pgcrypto with schema extensions;
+
+create or replace function public.auth_email_for(p_username text)
 returns text
 language sql
-security definer
-stable
-set search_path = public
+immutable
+set search_path = public, extensions
 as $$
-  select coalesce(p.email, u.email)
-  from auth.users u
-  left join public.profiles p on p.id = u.id
-  where lower(coalesce(p.username, u.raw_user_meta_data ->> 'username')) = lower(btrim(p_username))
-  order by u.created_at
-  limit 1;
+  select 'u-' || substr(encode(extensions.digest(lower(btrim(p_username)), 'sha256'), 'hex'), 1, 40)
+         || '@users.dailyink.app';
 $$;
 
-grant execute on function public.resolve_login_email(text) to anon, authenticated;
+revoke execute on function public.auth_email_for(text) from public, anon, authenticated;
+
+with target as (
+  select u.id,
+         public.auth_email_for(coalesce(p.username, u.raw_user_meta_data ->> 'username')) as new_email
+  from auth.users u
+  left join public.profiles p on p.id = u.id
+  where coalesce(p.username, u.raw_user_meta_data ->> 'username') is not null
+)
+update auth.users u
+set email = t.new_email, updated_at = now()
+from target t
+where u.id = t.id
+  and u.email is distinct from t.new_email
+  and not exists (select 1 from auth.users o where o.email = t.new_email and o.id <> u.id);
+
+update auth.identities i
+set identity_data = jsonb_set(i.identity_data, '{email}', to_jsonb(u.email)),
+    updated_at = now()
+from auth.users u
+where i.user_id = u.id
+  and i.provider = 'email'
+  and i.identity_data ->> 'email' is distinct from u.email;
+
+update public.profiles p
+set email = u.email
+from auth.users u
+where p.id = u.id and p.email is distinct from u.email;
+
+drop function if exists public.resolve_login_email(text);
+drop function if exists public.username_available(text);
 
 -- True when the signed-in user is flagged as an admin. SECURITY DEFINER so the
 -- login_events policies below can call it without recursing into the profiles
@@ -383,26 +380,6 @@ as $$
 $$;
 
 grant execute on function public.is_admin() to anon, authenticated;
-
--- True when no profile has claimed this username yet. Used for a friendly
--- "that username is taken" message at signup; the unique constraint on
--- profiles.username remains the real backstop if two signups race.
-create or replace function public.username_available(p_username text)
-returns boolean
-language sql
-security definer
-stable
-set search_path = public
-as $$
-  select not exists (
-    select 1
-    from auth.users u
-    left join public.profiles p on p.id = u.id
-    where lower(coalesce(p.username, u.raw_user_meta_data ->> 'username')) = lower(btrim(p_username))
-  );
-$$;
-
-grant execute on function public.username_available(text) to anon, authenticated;
 
 -- Backfill profiles for accounts created before the signup trigger or the
 -- username/email columns existed, so every account can be resolved at sign-in.
@@ -486,11 +463,45 @@ create index if not exists login_events_username_idx on public.login_events (low
 
 alter table public.login_events enable row level security;
 
--- Anyone (including a signed-out visitor whose password was wrong) may append
--- an attempt, otherwise failed logins could not be recorded at all.
+-- Nobody inserts directly. Events go through log_auth_event(), which takes the
+-- user id from the caller's own session (so events can't be forged for
+-- someone else), only lets signed-out callers record failures, and ignores
+-- floods: at most 20 events per username per 10 minutes.
 drop policy if exists "login_events_insert_any" on public.login_events;
-create policy "login_events_insert_any" on public.login_events
-  for insert with check (true);
+
+create or replace function public.log_auth_event(
+  p_username   text,
+  p_event      text,
+  p_success    boolean,
+  p_reason     text default null,
+  p_user_agent text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text := left(coalesce(btrim(p_username), ''), 64);
+begin
+  if p_event not in ('sign_in', 'sign_up', 'sign_out') then
+    return;
+  end if;
+  if auth.uid() is null and p_success then
+    return;
+  end if;
+  if (select count(*) from public.login_events
+      where lower(username) = lower(v_name)
+        and created_at > now() - interval '10 minutes') >= 20 then
+    return;
+  end if;
+  insert into public.login_events (username, user_id, event, success, reason, user_agent)
+  values (v_name, auth.uid(), p_event, p_success, left(p_reason, 200), left(p_user_agent, 300));
+end;
+$$;
+
+revoke execute on function public.log_auth_event(text, text, boolean, text, text) from public;
+grant execute on function public.log_auth_event(text, text, boolean, text, text) to anon, authenticated;
 
 -- Only admins may read or clear the log. There is intentionally no UPDATE
 -- policy: entries are append-only.

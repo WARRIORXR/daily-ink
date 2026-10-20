@@ -46,7 +46,7 @@ Try the deployed version at **[daily-ink-three.vercel.app](https://daily-ink-thr
 Without Supabase credentials the app runs in **local mode** — everything stays in the browser. To enable cloud sync:
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `profiles`, `credentials`, `entries`, `tasks`, `reviews`, `routines` and `login_events` tables with RLS policies and signup triggers, plus the security-definer functions the sign-in flow calls while the visitor is still anonymous (`username_available`, `resolve_login_email`), and registers the tables with the Realtime publication (needed for live cross-device sync). The file is safe to re-run - everything is idempotent.
+2. Open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `profiles`, `entries`, `tasks`, `reviews`, `routines` and `login_events` tables with RLS policies and signup triggers, plus `log_auth_event()` for the login log, and registers the tables with the Realtime publication (needed for live cross-device sync). The file is safe to re-run - everything is idempotent.
 3. Copy `.env.example` to `.env.local` and fill in your project URL and anon key (Dashboard → Project Settings → API):
 
 ```
@@ -54,9 +54,9 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 ```
 
-The anon key is safe for the browser; never use the `service_role` key here. `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are also accepted.
+The anon key is safe for the browser; never use the `service_role` key here (the build refuses to run if it finds one). `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are also accepted. Whatever name you use, the value ends up in the browser bundle.
 
-4. **Enable the Email provider and turn off email confirmation (required).** Sign-in is username-based, but Supabase Auth still runs it, so every account gets a synthetic `<username><timestamp>@dailyink.app` address that can never receive mail. In the dashboard go to **Authentication → Providers → Email** (direct link: `https://supabase.com/dashboard/project/<your-project-ref>/auth/providers`): switch the provider **ON** and uncheck **Confirm email**. With the provider off, signups fail with `Email signups are not allowed for this provider`; while confirmation is on, signup tries to send a confirmation email to an address that cannot receive one, so signups fail with `email rate limit exceeded` (Supabase throttles confirmation mail) and any account that does get created can never sign in. Both are hard requirements, not niceties. Supabase rejects reserved domains outright (`.local`, `.test`, `.invalid`), which is why the synthetic address uses a normal-looking one. The login screen detects both misconfigurations automatically (via `/auth/v1/settings`) and shows a banner with a working deep link into the dashboard; the banner re-checks and clears itself when you return from the dashboard.
+4. **Enable the Email provider and turn off email confirmation (required).** Sign-in is username-based, but Supabase Auth still runs it, so every account gets a synthetic `u-<first 40 hex of sha256(lowercase username)>@users.dailyink.app` address that can never receive mail. The browser derives it from the username, so signing in needs no lookup and nobody can ask the server whether a username exists. In the dashboard go to **Authentication → Providers → Email** (direct link: `https://supabase.com/dashboard/project/<your-project-ref>/auth/providers`): switch the provider **ON** and uncheck **Confirm email**. With the provider off, signups fail with `Email signups are not allowed for this provider`; while confirmation is on, signup tries to send a confirmation email to an address that cannot receive one, so signups fail with `email rate limit exceeded` (Supabase throttles confirmation mail) and any account that does get created can never sign in. Both are hard requirements, not niceties. Supabase rejects reserved domains outright (`.local`, `.test`, `.invalid`), which is why the synthetic address uses a normal-looking one. The login screen detects both misconfigurations automatically (via `/auth/v1/settings`) and shows a banner with a working deep link into the dashboard; the banner re-checks and clears itself when you return from the dashboard.
 
 5. **Make yourself an admin (optional).** Sign up in the app once, then run this in the SQL editor:
 
@@ -66,7 +66,14 @@ update public.profiles set is_admin = true where username = 'yourname';
 
 Admins get an **Admin** tab with a login-activity page (`/admin`): every sign-in, sign-up and sign-out attempt with its username, time, device and result.
 
-> **Passwords are never recorded.** Supabase Auth hashes passwords server-side, so no plaintext password ever exists in this project, and no password hash is readable by visitors. (The legacy `credentials` table is no longer used.) The login log intentionally stores usernames and timestamps only. The `is_admin` flag can only be set from the SQL editor: a database trigger stops the app from promoting itself, and row level security keeps the log readable by admins alone.
+> **Passwords are never recorded.** Supabase Auth hashes passwords server-side (bcrypt), so no plaintext password ever exists in this project, and no password hash is readable by anyone. The login log stores the username, user id, time, result, failure reason and browser of each attempt, never the password, and events can only be written through `log_auth_event()`, which takes the user id from the caller's own session. Every failed sign-in shows the same "Wrong username or password" message. The `is_admin` flag can only be set from the SQL editor: a database trigger stops the app from promoting itself, and row level security keeps the log readable by admins alone.
+
+6. **Recommended auth hardening.**
+   - Authentication → Policies (or Providers → Email): set the **minimum password length to 8**.
+   - Authentication → Rate Limits: keep the defaults on (they limit sign-ins and sign-ups per IP). The app also pauses after 5 failed attempts in a browser, doubling the wait each time.
+   - Optional CAPTCHA: create a free [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) widget, put its secret key in Authentication → Attack Protection → **Enable CAPTCHA protection** (provider Turnstile), and build the app with `VITE_TURNSTILE_SITE_KEY=<site key>`. The check then appears on the sign-in and sign-up forms.
+
+**Upgrading an existing project** to username-derived addresses: deploy the app first (it signs in old and new accounts), then run `supabase/migrations/2026-10-20_phase1_auth_hardening.sql` once. Nobody's password changes.
 
 ### 2. PWA icons (already generated)
 
