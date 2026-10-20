@@ -30,6 +30,20 @@ function swPrecache() {
   }
 }
 
+function assertPublicKey(key) {
+  if (key.startsWith('sb_secret_')) {
+    throw new Error('The Supabase key in your env is a secret key. Use the publishable/anon key.')
+  }
+  try {
+    const payload = JSON.parse(Buffer.from(key.split('.')[1] ?? '', 'base64url').toString())
+    if (payload.role === 'service_role') {
+      throw new Error('The Supabase key in your env is the service_role key. Use the anon key.')
+    }
+  } catch (err) {
+    if (/service_role/.test(err.message)) throw err
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
@@ -51,13 +65,15 @@ export default defineConfig(({ mode }) => {
     getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY') ||
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxeGF5dW9lcndidWFhYmVtcmFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzcxMTUsImV4cCI6MjEwNDU1MzExNX0.0qO0M7dDa_IpEziuAS5GXmXKyqoqRJV37dj2qWVZomc'
 
+  // Whatever name the key came from, it ends up in every visitor's browser, so
+  // refuse to build with a secret (service role) key by mistake.
+  assertPublicKey(supabaseAnonKey)
+
   return {
     plugins: [react(), tailwindcss(), swPrecache()],
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
-      'import.meta.env.SUPABASE_URL': JSON.stringify(supabaseUrl),
-      'import.meta.env.SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
     },
   }
 })

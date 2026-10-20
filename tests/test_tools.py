@@ -49,6 +49,13 @@ class BackupTests(unittest.TestCase):
                 backup.os.environ.update(env_backup)
 
 
+    def test_auth_email_matches_the_app_and_ignores_case_and_spaces(self):
+        # Same value src/utils/authEmail.js and schema.sql auth_email_for() give.
+        expected = "u-a95db5b0ac159e4384ff55ef91c94a98dc563d66@users.dailyink.app"
+        self.assertEqual(backup.auth_email_for("maya"), expected)
+        self.assertEqual(backup.auth_email_for("  Maya "), expected)
+
+
 class IconTests(unittest.TestCase):
     def test_icon_is_a_valid_png(self):
         png = generate_icons.draw_icon(48)

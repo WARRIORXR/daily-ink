@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { authProvidersUrl, checkAuthSetup } from '../config/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { captchaSiteKey } from '../utils/captcha'
+import Captcha from './Captcha'
 
 const inputClass =
   'w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-ink outline-none ring-accent/30 placeholder:text-faint transition focus:ring-4'
@@ -49,7 +51,7 @@ function CheckIcon({ className = 'h-4 w-4' }) {
 }
 
 /** Client-side checks mirroring what Supabase will enforce anyway. */
-function validateFields(username, password) {
+function validateFields(username, password, signup) {
   const errors = {}
   const name = username.trim()
   if (!name) errors.username = 'Pick a username.'
@@ -57,7 +59,7 @@ function validateFields(username, password) {
   else if (name.length > 32) errors.username = 'Keep it under 32 characters.'
 
   if (!password) errors.password = 'Enter a password.'
-  else if (password.length < 6) errors.password = 'Use at least 6 characters.'
+  else if (signup && password.length < 8) errors.password = 'Use at least 8 characters.'
 
   return errors
 }
@@ -110,6 +112,9 @@ export default function AuthForm() {
   // off or "Confirm email" on). Re-checked when the user returns from the
   // dashboard so the banner clears itself once the toggles are fixed.
   const [setupIssue, setSetupIssue] = useState(null)
+  // Turnstile tokens are single-use: remount the widget after every attempt.
+  const [captchaToken, setCaptchaToken] = useState(null)
+  const [captchaRound, setCaptchaRound] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -138,7 +143,7 @@ export default function AuthForm() {
 
   function revalidate(nextUsername, nextPassword) {
     if (!submitted) return
-    setFieldErrors(validateFields(nextUsername, nextPassword))
+    setFieldErrors(validateFields(nextUsername, nextPassword, isSignup))
   }
 
   async function handleSubmit(event) {
@@ -147,7 +152,7 @@ export default function AuthForm() {
     setNotice(null)
     setSubmitted(true)
 
-    const errors = validateFields(username, password)
+    const errors = validateFields(username, password, isSignup)
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
       const firstInvalid = errors.username ? 'auth-username' : 'auth-password'
@@ -155,10 +160,15 @@ export default function AuthForm() {
       return
     }
 
+    if (captchaSiteKey && !captchaToken) {
+      setServerError('Please complete the "I am human" check first.')
+      return
+    }
+
     setBusy(true)
     try {
       if (isSignup) {
-        const { error, needsConfirmation } = await signUp(username.trim(), password)
+        const { error, needsConfirmation } = await signUp(username.trim(), password, captchaToken)
         if (error) {
           setServerError(error)
         } else if (needsConfirmation) {
@@ -174,13 +184,17 @@ export default function AuthForm() {
           setNotice('Account created. Welcome in.')
         }
       } else {
-        const { error } = await signIn(username.trim(), password)
+        const { error } = await signIn(username.trim(), password, captchaToken)
         if (error) setServerError(error)
       }
     } catch (err) {
       setServerError(err?.message || 'An unexpected error occurred.')
     } finally {
       setBusy(false)
+      if (captchaSiteKey) {
+        setCaptchaToken(null)
+        setCaptchaRound((n) => n + 1)
+      }
     }
   }
 
@@ -330,6 +344,8 @@ export default function AuthForm() {
             </p>
           ) : null}
         </div>
+
+        <Captcha key={captchaRound} onToken={setCaptchaToken} />
 
         <button
           type="submit"

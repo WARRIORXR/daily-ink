@@ -1,5 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { authProvidersUrl, isSupabaseConfigured, supabase } from '../config/supabaseClient'
+import { attemptWait, recordFailure, recordSuccess, waitMessage } from '../utils/attempts'
+import { authEmailFor } from '../utils/authEmail'
+
+// One message for every failed sign-in, so the form never reveals whether a
+// username exists.
+const SIGN_IN_FAILED = 'Wrong username or password.'
 
 const AuthContext = createContext(null)
 const GUEST_KEY = 'daily_ink_guest_mode'
@@ -10,9 +16,12 @@ function friendlyAuthError(message) {
     return 'Your Supabase project is missing the latest schema. Open the SQL editor, run supabase/schema.sql, then try again.'
   }
   if (/invalid login credentials|wrong password|password.*invalid/i.test(raw)) {
-    return 'Wrong username or password.'
+    return SIGN_IN_FAILED
   }
-  if (/user already registered|duplicate key.*username|database error saving new user/i.test(raw)) {
+  if (/captcha/i.test(raw)) {
+    return 'Please complete the "I am human" check and try again.'
+  }
+  if (/user already registered|already exists|duplicate key.*username|database error saving new user/i.test(raw)) {
     return 'That username is already taken.'
   }
   if (/password should be at least/i.test(raw)) {
@@ -30,28 +39,44 @@ function friendlyAuthError(message) {
   return raw || 'Something went wrong. Please try again.'
 }
 
+// Sign-in activity goes through log_auth_event(), which takes the user id from
+// the session itself, so nobody can write events in someone else's name.
+// Projects that haven't run the Phase 1 SQL yet still use the old insert.
 async function logLoginEvent({ username, userId = null, event, success, reason = null }) {
   if (!supabase) return
+  const userAgent = typeof navigator === 'undefined' ? null : navigator.userAgent.slice(0, 300)
   try {
+    const { error } = await supabase.rpc('log_auth_event', {
+      p_username: (username ?? '').slice(0, 64),
+      p_event: event,
+      p_success: success,
+      p_reason: reason ? String(reason).slice(0, 200) : null,
+      p_user_agent: userAgent,
+    })
+    if (!error) return
     await supabase.from('login_events').insert({
       username: (username ?? '').slice(0, 64),
       user_id: userId,
       event,
       success,
       reason,
-      user_agent:
-        typeof navigator === 'undefined' ? null : navigator.userAgent.slice(0, 300),
+      user_agent: userAgent,
     })
   } catch {
     /* never block authentication on a logging failure */
   }
 }
 
-// Generate a deterministic email from username for Supabase Auth.
-// This is internal only — the user never sees or enters it.
-function generateAuthEmail(username) {
-  const clean = username.toLowerCase().replace(/[^a-z0-9]/g, '') || 'user'
-  return `${clean}${Date.now()}@dailyink.app`
+// Accounts created before the Phase 1 migration have a timestamped address
+// that only the server knows. Once the migration has run, the lookup function
+// is gone and this returns null.
+async function legacyAuthEmail(username) {
+  try {
+    const { data, error } = await supabase.rpc('resolve_login_email', { p_username: username })
+    return error ? null : data
+  } catch {
+    return null
+  }
 }
 
 export function AuthProvider({ children }) {
@@ -142,51 +167,31 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // Check if a username is free. Anon cannot read the credentials table
-  // directly (owner-only RLS), so this goes through the security-definer RPC.
-  async function isUsernameAvailable(username) {
-    const { data, error } = await supabase.rpc('username_available', {
-      p_username: username,
-    })
-    if (error) {
-      return { available: true, error: error.message }
-    }
-    return { available: data === true, error: null }
-  }
-
   // Sign up: create auth user + store credentials
   const signUp = useCallback(
-    async (username, password) => {
+    async (username, password, captchaToken) => {
       setError(null)
       if (!supabase) {
         return { error: 'Supabase is not configured yet. Add your project credentials in .env.local' }
       }
       const clean = username.trim()
       try {
-        // Check username availability
-        const { available, error: checkError } = await isUsernameAvailable(clean)
-        if (!available && !checkError) {
-          const msg = 'That username is already taken.'
-          setError(msg)
-          return { error: msg }
-        }
-        if (checkError) {
-          setError(friendlyAuthError(checkError))
-          return { error: friendlyAuthError(checkError) }
-        }
+        const wait = attemptWait()
+        if (wait) return { error: waitMessage(wait) }
 
-        // Generate internal email for Supabase Auth
-        const email = generateAuthEmail(clean)
-
-        // Create auth user
+        // A taken username is reported by Supabase itself (the address
+        // already exists, or the unique username index rejects the profile),
+        // so there is no separate "is this name free?" lookup to abuse.
         const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
+          email: await authEmailFor(clean),
           password,
           options: {
             data: { username: clean },
+            ...(captchaToken ? { captchaToken } : {}),
           },
         })
         if (signUpError) {
+          recordFailure()
           setError(friendlyAuthError(signUpError.message))
           await logLoginEvent({
             username: clean,
@@ -201,6 +206,7 @@ export function AuthProvider({ children }) {
         // else needs saving here. (Earlier versions also wrote a browser-side
         // hash to public.credentials; sign-in no longer reads it.)
 
+        recordSuccess()
         // If signUp returned a session, we're already logged in
         if (data.session) {
           setSession(data.session)
@@ -227,50 +233,49 @@ export function AuthProvider({ children }) {
     [exitGuestMode],
   )
 
-  // Sign in: resolve the username to its internal sign-in address, then let
-  // Supabase Auth verify the password.
+  // Sign in: derive the username's sign-in address and let Supabase Auth
+  // verify the password. Every failure gets the same message.
   const signIn = useCallback(
-    async (username, password) => {
+    async (username, password, captchaToken) => {
       setError(null)
       if (!supabase) {
         return { error: 'Supabase is not configured yet. Add your project credentials in .env.local' }
       }
       const clean = username.trim()
       try {
-        // The visitor is still anonymous and profiles is owner-only, so the
-        // lookup goes through the security-definer RPC.
-        const { data: authEmail, error: emailError } = await supabase.rpc(
-          'resolve_login_email',
-          { p_username: clean },
-        )
-        if (emailError || !authEmail) {
-          const msg = emailError
-            ? friendlyAuthError(emailError.message)
-            : 'No account found with that username.'
-          setError(msg)
-          await logLoginEvent({
-            username: clean,
-            event: 'sign_in',
-            success: false,
-            reason: emailError?.message ?? 'unknown username',
-          })
-          return { error: msg }
-        }
+        const wait = attemptWait()
+        if (wait) return { error: waitMessage(wait) }
 
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email: authEmail,
+        const options = captchaToken ? { captchaToken } : undefined
+        const email = await authEmailFor(clean)
+        let { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
           password,
+          options,
         })
+        if (signInError && /invalid login credentials/i.test(signInError.message)) {
+          const legacy = await legacyAuthEmail(clean)
+          if (legacy && legacy !== email) {
+            ;({ data, error: signInError } = await supabase.auth.signInWithPassword({
+              email: legacy,
+              password,
+              options,
+            }))
+          }
+        }
         if (signInError) {
-          setError(friendlyAuthError(signInError.message))
+          recordFailure()
+          const msg = friendlyAuthError(signInError.message)
+          setError(msg)
           await logLoginEvent({
             username: clean,
             event: 'sign_in',
             success: false,
             reason: signInError.message,
           })
-          return { error: friendlyAuthError(signInError.message) }
+          return { error: msg }
         }
+        recordSuccess()
         setSession(data.session)
         exitGuestMode()
         await logLoginEvent({
