@@ -7,6 +7,7 @@ import {
   isDayInMonth,
   parseEntryKey,
 } from '../utils/formatDate'
+import { moodByKey } from '../utils/moods'
 import { getRoutinesForDate } from '../utils/routines'
 
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
@@ -24,12 +25,7 @@ function NavButton({ onClick, label, children }) {
   )
 }
 
-export default function CalendarView({
-  entries,
-  routines = [],
-  selectedDate,
-  onSelectDate,
-}) {
+export default function CalendarView({ entries, routines = [], selectedDate, onSelectDate }) {
   const [cursor, setCursor] = useState(() =>
     selectedDate ? parseEntryKey(selectedDate) : new Date(),
   )
@@ -42,10 +38,11 @@ export default function CalendarView({
   }
 
   const weeks = getMonthWeeks(cursor)
-  const hasEntry = (day) => Boolean(entries[getEntryKey(day)])
-  const monthKey = getEntryKey(
-    new Date(cursor.getFullYear(), cursor.getMonth(), 1),
-  )
+  const monthPrefix = getEntryKey(cursor).slice(0, 7)
+  const writtenThisMonth = Object.entries(entries).filter(
+    ([key, entry]) => key.startsWith(monthPrefix) && entry?.content,
+  ).length
+  const monthKey = getEntryKey(new Date(cursor.getFullYear(), cursor.getMonth(), 1))
 
   return (
     <div className="space-y-4">
@@ -53,15 +50,15 @@ export default function CalendarView({
       <div className="flex items-center justify-between">
         <div>
           <p className="font-hand text-lg leading-none text-accent">your memory map</p>
-          <h2 className="mt-0.5 font-display text-2xl text-ink">
-            {getMonthLabel(cursor)}
-          </h2>
+          <h2 className="mt-0.5 font-display text-2xl text-ink">{getMonthLabel(cursor)}</h2>
+          <p className="mt-0.5 text-xs text-muted">
+            {writtenThisMonth
+              ? `${writtenThisMonth} page${writtenThisMonth === 1 ? '' : 's'} written this month`
+              : 'No pages this month yet'}
+          </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <NavButton
-            onClick={() => setCursor((c) => subMonths(c, 1))}
-            label="Previous month"
-          >
+          <NavButton onClick={() => setCursor((c) => subMonths(c, 1))} label="Previous month">
             <svg
               width="15"
               height="15"
@@ -83,10 +80,7 @@ export default function CalendarView({
           >
             Today
           </button>
-          <NavButton
-            onClick={() => setCursor((c) => addMonths(c, 1))}
-            label="Next month"
-          >
+          <NavButton onClick={() => setCursor((c) => addMonths(c, 1))} label="Next month">
             <svg
               width="15"
               height="15"
@@ -105,123 +99,125 @@ export default function CalendarView({
       </div>
 
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-faint">
+      <div
+        aria-hidden="true"
+        className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-medium uppercase tracking-[0.15em] text-muted"
+      >
         {WEEKDAYS.map((day) => (
-          <div key={day} className="py-1">
+          <div key={day} className="pb-1">
             {day}
           </div>
         ))}
       </div>
 
-      {/* Calendar grid */}
-      <div key={monthKey} className="grid grid-cols-7 gap-1 animate-fade-in">
+      {/* Calendar grid: each day keeps its number on top and its marks in a
+          row at the bottom, so nothing can drift outside the cell. */}
+      <div key={monthKey} className="grid grid-cols-7 gap-1.5 animate-fade-in">
         {weeks.flat().map((day) => {
           const key = getEntryKey(day)
           const inMonth = isDayInMonth(day, cursor)
           const selected = key === selectedDate
           const todayFlag = isToday(day)
+          const entry = entries[key]
+          const written = Boolean(entry?.content)
+          const mood = moodByKey(entry?.mood)
           const dayRoutines = getRoutinesForDate(routines, key)
+          const label = [
+            format(day, 'EEEE, MMMM d, yyyy'),
+            todayFlag && 'today',
+            written && 'has an entry',
+            mood && `mood ${mood.label}`,
+            dayRoutines.length &&
+              `${dayRoutines.length} routine${dayRoutines.length === 1 ? '' : 's'}`,
+          ]
+            .filter(Boolean)
+            .join(', ')
 
           return (
             <button
               key={key}
               type="button"
               onClick={() => onSelectDate(key)}
-              aria-label={format(day, 'EEEE, MMMM d, yyyy')}
+              aria-label={label}
               aria-pressed={selected}
-              className={`group relative flex aspect-square items-center justify-center rounded-xl text-sm transition duration-150 ${
-                inMonth ? 'text-ink' : 'text-faint/40'
-              } ${
+              className={`group flex h-14 min-w-0 flex-col items-center justify-between overflow-hidden rounded-xl border px-1 py-1.5 text-sm transition duration-150 sm:h-[4.5rem] sm:items-start sm:px-2 ${
                 selected
-                  ? 'bg-accent text-on-accent shadow-sm'
-                  : 'hover:bg-surface-2'
-              } ${
-                todayFlag && !selected
-                  ? 'ring-1 ring-inset ring-accent/50'
-                  : ''
-              }`}
+                  ? 'border-accent bg-accent-soft shadow-sm ring-2 ring-accent/40'
+                  : written
+                    ? 'border-accent/25 bg-accent-soft hover:border-accent/60'
+                    : 'border-transparent hover:border-border hover:bg-surface-2'
+              } ${inMonth ? 'text-ink' : 'text-faint opacity-60'}`}
             >
-              <span className="relative z-10">{format(day, 'd')}</span>
+              <span
+                className={`grid h-6 min-w-6 place-items-center rounded-full px-1 text-xs leading-none sm:text-sm ${
+                  todayFlag
+                    ? 'bg-accent font-semibold text-on-accent'
+                    : selected
+                      ? 'font-semibold'
+                      : ''
+                }`}
+              >
+                {format(day, 'd')}
+              </span>
 
-              {/* Journal entry indicator */}
-              {hasEntry(day) && (
-                <span
-                  aria-hidden="true"
-                  className={`absolute bottom-1 h-1 w-1 rounded-full transition ${
-                    selected ? 'bg-on-accent' : 'bg-accent group-hover:scale-125'
-                  }`}
-                />
-              )}
-
-              {/* Routine indicator dots */}
-              {dayRoutines.length > 0 && (
-                <div
-                  className="absolute top-1 right-1 flex gap-0.5"
-                  title={
-                    dayRoutines
-                      .map(
-                        (r) =>
-                          `${r.icon ? `${r.icon} ` : ''}${r.title}${
-                            r.completions?.includes(key) ? ' (Done)' : ''
-                          }`,
-                      )
-                      .join('\n')
-                  }
-                >
-                  {dayRoutines.slice(0, 3).map((r) => {
-                    const isCompleted = r.completions?.includes(key)
-                    return (
-                      <span
-                        key={r.id}
-                        className={`h-1.5 w-1.5 rounded-full transition-all ${
-                          isCompleted
-                            ? 'opacity-40 ring-1 ring-black/20 dark:ring-white/30'
-                            : 'opacity-90'
-                        }`}
-                        style={{
-                          backgroundColor: selected
-                            ? '#ffffff'
-                            : r.color,
-                        }}
-                      />
-                    )
-                  })}
-                  {dayRoutines.length > 3 && (
-                    <span
-                      className="h-1.5 w-1.5 rounded-full bg-faint text-[9px] font-medium flex items-center justify-center text-on-accent"
-                      title={`${dayRoutines.length} routines`}
-                    >
-                      +{dayRoutines.length - 3}
-                    </span>
-                  )}
-                </div>
-              )}
+              <span aria-hidden="true" className="flex h-4 max-w-full items-center gap-0.5">
+                {mood ? (
+                  <span className="text-xs leading-none sm:text-sm" title={mood.label}>
+                    {mood.emoji}
+                  </span>
+                ) : written ? (
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                ) : null}
+                {dayRoutines.slice(0, 3).map((r) => (
+                  <span
+                    key={r.id}
+                    className={`hidden h-1.5 w-1.5 shrink-0 rounded-full sm:block ${
+                      r.completions?.includes(key) ? 'opacity-40' : ''
+                    }`}
+                    style={{ backgroundColor: r.color }}
+                  />
+                ))}
+                {dayRoutines.length > 0 && (
+                  <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full sm:hidden"
+                    style={{ backgroundColor: dayRoutines[0].color }}
+                  />
+                )}
+                {dayRoutines.length > 3 && (
+                  <span className="hidden text-[10px] leading-none text-muted sm:inline">
+                    +{dayRoutines.length - 3}
+                  </span>
+                )}
+              </span>
             </button>
           )
         })}
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-faint">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
         <span className="flex items-center gap-1.5">
           <span
             aria-hidden="true"
-            className="h-1.5 w-1.5 rounded-full bg-accent"
+            className="h-3 w-3 rounded border border-accent/25 bg-accent-soft"
           />
-          has an entry
+          written
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true">🙂</span>
+          mood
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
+          routine
         </span>
         <span className="flex items-center gap-1.5">
           <span
             aria-hidden="true"
-            className="h-1.5 w-1.5 rounded-full bg-amber-500"
-          />
-          routine scheduled
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span
-            aria-hidden="true"
-            className="h-3 w-3 rounded ring-1 ring-inset ring-accent/60"
-          />
+            className="grid h-4 w-4 place-items-center rounded-full bg-accent text-[9px] font-semibold text-on-accent"
+          >
+            {format(new Date(), 'd')}
+          </span>
           today
         </span>
       </div>
