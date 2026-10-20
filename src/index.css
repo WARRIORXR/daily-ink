@@ -77,14 +77,14 @@
   --surface-2: #f0e9dc;
   --ink: #1c1917;
   --muted: #57534e;
-  --faint: #a8a29e;
+  --faint: #6f6862; /* 4.5:1+ on every light surface (WCAG AA) */
   --border: #e7e0d2;
-  --accent: #b45309;
-  --accent-soft: rgba(180, 83, 9, 0.12);
+  --accent: #a34a07;
+  --accent-soft: rgba(163, 74, 7, 0.12);
   --on-accent: #fffbeb;
-  --clay: #b4533a;
-  --clay-soft: rgba(180, 83, 58, 0.12);
-  --success: #15803d;
+  --clay: #a3472f;
+  --clay-soft: rgba(163, 71, 47, 0.12);
+  --success: #13753a;
   --danger: #b91c1c;
   --warn: #92400e;
 }
