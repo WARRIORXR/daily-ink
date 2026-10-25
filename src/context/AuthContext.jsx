@@ -25,7 +25,7 @@ function friendlyAuthError(message) {
     return 'That username is already taken.'
   }
   if (/password should be at least/i.test(raw)) {
-    return 'Passwords need at least 6 characters.'
+    return 'Passwords need at least 8 characters.'
   }
   if (/not allowed for this provider|email provider is disabled|signup.*disabled/i.test(raw)) {
     return `Email sign-in is turned off in your Supabase project (one-time setup). Open ${authProvidersUrl} — switch the Email provider ON, uncheck "Confirm email", then Save. You never need to enter an email here.`
