@@ -280,7 +280,11 @@ export default function Settings() {
       {/* Account & Sync */}
       <Section
         title="Account & Sync"
-        description="Sign in to sync your journal across devices. Without it, everything stays in this browser."
+        description={
+          user
+            ? 'Signed in — your journal syncs securely across your devices.'
+            : 'Sign in to sync your journal across devices. Without it, everything stays in this browser.'
+        }
       >
         <Row
           label={

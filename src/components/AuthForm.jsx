@@ -316,7 +316,7 @@ export default function AuthForm() {
               id="auth-password"
               type={showPassword ? 'text' : 'password'}
               autoComplete={isSignup ? 'new-password' : 'current-password'}
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
               value={password}
               aria-invalid={Boolean(fieldErrors.password)}
               aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
