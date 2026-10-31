@@ -39,3 +39,5 @@ core/target
 __pycache__/
 *.pyc
 backups/
+
+.codex/
