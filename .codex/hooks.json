@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node 'd:\\ANTIGRAVITY\\writing app\\.codex\\hooks\\auto-push-github.mjs'",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
